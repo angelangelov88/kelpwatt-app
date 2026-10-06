@@ -18,11 +18,6 @@ const useOctopus = () => {
     void slotsQuery.refetch({ cancelRefetch: false });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return `${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "Europe/London" })} ${date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/London" })}`;
-  };
-
   return {
     slotsLoading: slotsQuery.isFetching,
     // Queries have no onError, so the caller toasts these. errorUpdatedAt changes on
@@ -31,8 +26,36 @@ const useOctopus = () => {
     slotsErrorUpdatedAt: slotsQuery.errorUpdatedAt,
     slotsData: slotsQuery.data,
     fetchSlots,
-    formatDate,
+    formatTime,
+    formatDay,
   };
+};
+
+const UK = "Europe/London";
+
+const ukDay = (d: Date) => d.toLocaleDateString("en-GB", { timeZone: UK });
+
+// "23:30", in UK time.
+const formatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: UK,
+  });
+
+// "Today", "Tomorrow", or "Wed 7 Oct", in UK time. Slots are always within the
+// next 24 hours, so this is only a reference next to the times.
+const formatDay = (iso: string, now = new Date()) => {
+  const date = new Date(iso);
+  if (ukDay(date) === ukDay(now)) return "Today";
+  if (ukDay(date) === ukDay(new Date(now.getTime() + 24 * 60 * 60 * 1000)))
+    return "Tomorrow";
+  return date.toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: UK,
+  });
 };
 
 export default useOctopus;
