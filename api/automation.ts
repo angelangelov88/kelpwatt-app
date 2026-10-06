@@ -8,7 +8,7 @@ import { rateLimit } from "./_lib/rateLimit";
 import { requireUser } from "./_lib/session";
 import { readAutomationStatus } from "./_lib/userData";
 
-// A check that writes the inverter takes 25–35s.
+// A check that writes the inverter takes 20–30s.
 export const config = { maxDuration: 60 };
 
 // GET → AutomationStatus: what automatic charging last did.

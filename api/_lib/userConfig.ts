@@ -63,19 +63,24 @@ const loadCredentials = async <P extends Provider>(
 };
 
 // A Growatt client for one user. Its session lives only in this client, so it
-// is never shared with another user's requests.
-const growattClientFor = (secret: Secrets["growatt"]) =>
+// is never shared with another user's requests. deadline: when it stops
+// calling Growatt (epoch ms).
+const growattClientFor = (secret: Secrets["growatt"], deadline?: number) =>
   createGrowattClient({
     user: secret.user,
     passwordMd5: secret.passwordMd5,
     buildUrl: (path) => `${GROWATT_BASE}${path}`,
+    deadline,
   });
 
 // The user's Growatt client and inverter serial, or null if not set up.
-const loadGrowatt = async (userId: string) => {
+const loadGrowatt = async (userId: string, deadline?: number) => {
   const creds = await loadCredentials(userId, "growatt");
   if (!creds) return null;
-  return { serial: creds.identifier, client: growattClientFor(creds.secret) };
+  return {
+    serial: creds.identifier,
+    client: growattClientFor(creds.secret, deadline),
+  };
 };
 
 // The user's Octopus API key and account number, or null if not set up.

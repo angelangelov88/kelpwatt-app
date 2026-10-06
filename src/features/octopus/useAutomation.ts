@@ -7,6 +7,11 @@ import { CHARGE_KEY, toPeriods } from "../growatt/useGrowatt";
 
 const AUTOMATION_KEY = ["automation"];
 
+// Checks run every 5 minutes, so three missed in a row means they've stopped:
+// the schedule isn't running, or every check is cut off before it can save
+// anything.
+const STALE_MS = 15 * 60 * 1000;
+
 // What automatic charging last did, and the Sync now button. Only used while
 // automation is on. onChecked runs after every Sync now that reached the
 // server, e.g. to refresh the Octopus slots shown.
@@ -49,8 +54,16 @@ const useAutomation = ({ onChecked }: { onChecked: () => void }) => {
     },
   });
 
+  // Measured from when the status was fetched (every minute), not from now,
+  // so rendering stays pure.
+  const checkedAt = statusQuery.data?.checkedAt;
+  const isStale =
+    !!checkedAt &&
+    statusQuery.dataUpdatedAt - new Date(checkedAt).getTime() > STALE_MS;
+
   return {
     status: statusQuery.data,
+    isStale,
     checkNow: () => {
       checkNow.mutate();
     },

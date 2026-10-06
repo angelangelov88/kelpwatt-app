@@ -6,11 +6,13 @@ import useAutomation from "./useAutomation";
 // Shown instead of the Apply button while automatic charging is on: runs the
 // scheduled check straight away (after plugging the car in, say).
 const CheckNow = ({ onChecked }: CheckNowProps) => {
-  const { status, checkNow, isChecking } = useAutomation({ onChecked });
+  const { status, isStale, checkNow, isChecking } = useAutomation({
+    onChecked,
+  });
 
   return (
     <div className="flex flex-col gap-3">
-      <AutomationStatusLine status={status} />
+      <AutomationStatusLine status={status} isStale={isStale} />
       <button
         onClick={checkNow}
         disabled={isChecking}

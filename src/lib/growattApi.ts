@@ -7,6 +7,22 @@ import type {
   SlotParam,
 } from "../types/Growatt";
 
+// Thrown instead of calling Growatt once the client's deadline is too close.
+class GrowattDeadlineError extends Error {
+  constructor() {
+    super("Growatt took too long to respond");
+    this.name = "GrowattDeadlineError";
+  }
+}
+
+const REQUEST_TIMEOUT_MS = 20_000;
+// Not worth starting a request with less time left than this.
+const MIN_REQUEST_MS = 2_000;
+// A write is two requests 3s apart, usually under 10s in all. Not started with
+// less time left than this, so it isn't stopped halfway with slots 1–3 changed
+// and 4–6 not.
+const WRITE_NEEDS_MS = 20_000;
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 // Used by the server (one client per user) and the Node script. Each caller
 // passes its own credentials and URL builder.
@@ -16,7 +32,11 @@ const createGrowattClient = ({
   passwordMd5,
   buildUrl,
   debug = false,
+  deadline,
 }: GrowattConfig) => {
+  const timeLeft = () =>
+    deadline === undefined ? Infinity : deadline - Date.now();
+
   // The session lives only in this client, so on the server one user's Growatt
   // session can never be used for another.
   let sessionCookie = "";
@@ -31,20 +51,31 @@ const createGrowattClient = ({
     if (body) headers["Content-Type"] = "application/x-www-form-urlencoded";
     if (sessionCookie) headers.Cookie = sessionCookie;
 
-    const res = await fetch(buildUrl(path), {
-      method: body ? "POST" : "GET",
-      headers,
-      body: body ? new URLSearchParams(body) : undefined,
-      signal: AbortSignal.timeout(20_000),
-    });
+    const left = timeLeft();
+    if (left < MIN_REQUEST_MS) throw new GrowattDeadlineError();
+    // Cut short by the deadline rather than Growatt's usual timeout.
+    const isCut = left < REQUEST_TIMEOUT_MS;
+    let text: string;
+    try {
+      const res = await fetch(buildUrl(path), {
+        method: body ? "POST" : "GET",
+        headers,
+        body: body ? new URLSearchParams(body) : undefined,
+        signal: AbortSignal.timeout(Math.min(left, REQUEST_TIMEOUT_MS)),
+      });
 
-    const setCookie = res.headers.get("set-cookie");
-    if (setCookie) {
-      const match = /JSESSIONID=[^;]+/.exec(setCookie);
-      if (match) sessionCookie = match[0];
+      const setCookie = res.headers.get("set-cookie");
+      if (setCookie) {
+        const match = /JSESSIONID=[^;]+/.exec(setCookie);
+        if (match) sessionCookie = match[0];
+      }
+
+      text = await res.text();
+    } catch (err) {
+      if (isCut && err instanceof Error && err.name === "TimeoutError")
+        throw new GrowattDeadlineError();
+      throw err;
     }
-
-    const text = await res.text();
     // Never the login reply: it describes the account.
     if (debug && path !== "/login")
       console.log(`${body ? "POST" : "GET"} ${path}:`, text);
@@ -97,7 +128,11 @@ const createGrowattClient = ({
   };
 
   const readDelay = () => new Promise((resolve) => setTimeout(resolve, 3000));
-  const writeDelay = () => new Promise((resolve) => setTimeout(resolve, 10000));
+  // Between the two requests of a write (slots 1–3, then 4–6). Growatt only
+  // replies to the first once the datalogger has passed it on, so this is the
+  // same gap as between reads. It was 10s; if slots 4–6 ever don't stick,
+  // raise it.
+  const writeDelay = () => new Promise((resolve) => setTimeout(resolve, 3000));
 
   // The inverter can only handle one tcpSet call at a time, so every read/write
   // goes through this queue, with a gap before the next one starts. The datalogger
@@ -285,6 +320,7 @@ const createGrowattClient = ({
     ) =>
       enqueue(async () => {
         await ensureLoggedIn();
+        if (timeLeft() < WRITE_NEEDS_MS) throw new GrowattDeadlineError();
         await request("/tcpSet.do", {
           action: "mixSet",
           serialNum: serial,
@@ -331,6 +367,7 @@ const createGrowattClient = ({
     ) =>
       enqueue(async () => {
         await ensureLoggedIn();
+        if (timeLeft() < WRITE_NEEDS_MS) throw new GrowattDeadlineError();
         await request("/tcpSet.do", {
           action: "mixSet",
           serialNum: serial,
@@ -365,4 +402,4 @@ const createGrowattClient = ({
   };
 };
 
-export { createGrowattClient };
+export { GrowattDeadlineError, createGrowattClient };
