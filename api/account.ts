@@ -61,7 +61,8 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         from private.audit_log
         where ${before.data ?? null}::bigint is null
           or id < ${before.data ?? null}::bigint
-        order by id desc
+        -- audit_log.id, not the text alias above: as text, "99" sorts before "118".
+        order by audit_log.id desc
         limit ${PAGE_SIZE + 1}`,
     );
     const entries = rows.slice(0, PAGE_SIZE);

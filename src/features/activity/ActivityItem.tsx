@@ -6,7 +6,9 @@ import describeActivity from "./describeActivity";
 const ActivityItem = ({ entry }: ActivityItemProps) => {
   const { title, detail, failed } = describeActivity(entry);
   return (
-    <li className="flex gap-4 py-3">
+    // data-id: the audit_log id, for support. Not shown, as it means nothing to
+    // the user and the gaps between ids hint at other users' activity.
+    <li data-id={entry.id} className="flex gap-4 py-3">
       <time
         dateTime={entry.at}
         className="w-12 shrink-0 text-sm tabular-nums text-gray-500"
