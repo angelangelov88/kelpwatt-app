@@ -172,10 +172,33 @@ const planMatches = (plan: ChargePlan, current: ChargePeriods) =>
   String(current.stopSOC) === plan.stopSOC &&
   describePlan(plan) === describePeriods(current);
 
+// A removed slot whose end passed this recently was dropped for being over,
+// not cancelled by Octopus.
+const ENDED_WITHIN_MINUTES = 60;
+
+// What writing a plan changes on the inverter, from describePeriods (before)
+// and describePlan (after), for the activity log. Each is a describePlan-style
+// list, "" when empty. ended: removed slots that had just finished.
+const diffPlan = (before: string, after: string, now = new Date()) => {
+  const list = (slots: string) => slots.split(", ").filter((s) => s !== "");
+  const was = list(before);
+  const is = list(after);
+  const nowMinutes = toUkMinutes(now);
+  const hasEnded = (slot: string) =>
+    (nowMinutes - toMinutes(slot.slice(6)) + DAY) % DAY < ENDED_WITHIN_MINUTES;
+  const removed = was.filter((s) => !is.includes(s));
+  return {
+    added: is.filter((s) => !was.includes(s)).join(", "),
+    ended: removed.filter(hasEnded).join(", "),
+    removed: removed.filter((s) => !hasEnded(s)).join(", "),
+  };
+};
+
 export {
   toUkMinutes,
   buildChargePlan,
   describePlan,
   describePeriods,
+  diffPlan,
   planMatches,
 };

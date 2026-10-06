@@ -78,11 +78,23 @@ const describeAutomation = (details: unknown): ActivityDescription => {
   switch (text(details, "result")) {
     case "applied": {
       const skipped = number(details, "skipped") ?? 0;
+      // What changed, compared with what the inverter had. Entries from before
+      // these were recorded have none of them.
+      const ended = text(details, "ended");
+      const removed = text(details, "removed");
+      const added = text(details, "added");
+      const changes = [
+        ended && `${formatSlots(ended)} finished`,
+        removed && `removed ${formatSlots(removed)}`,
+        added && `added ${formatSlots(added)}`,
+      ].filter((c): c is string => typeof c === "string");
+      const slots = formatSlots(text(details, "slots"));
       return {
         title: "Automatic charging updated your inverter",
         detail: join([
           trigger,
-          formatSlots(text(details, "slots")),
+          ...changes,
+          changes.length > 0 ? `now ${slots}` : slots,
           ...powerAndStop(details),
           skipped > 0 &&
             `${String(skipped)} Octopus slot${skipped === 1 ? "" : "s"} didn't fit`,

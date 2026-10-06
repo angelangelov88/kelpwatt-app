@@ -3,6 +3,7 @@ import {
   buildChargePlan,
   describePeriods,
   describePlan,
+  diffPlan,
   planMatches,
 } from "../../src/lib/chargePlan";
 import { resetDay, ukDay } from "../../src/lib/dailyExport";
@@ -115,28 +116,29 @@ const onInverter = async <T>(step: () => Promise<T>) => {
 };
 
 // Reads the inverter's charge times and writes the plan unless it's already
-// there. Returns true if it wrote.
+// there. Returns the times it replaced (describePeriods) if it wrote, else null.
 const applyToInverter = async (
   { client, serial }: Growatt,
   plan: ChargePlan,
-) => {
+): Promise<string | null> => {
   await logIn(client);
   return onInverter(async () => {
-    if (planMatches(plan, await client.fetchChargePeriods(serial)))
-      return false;
+    const current = await client.fetchChargePeriods(serial);
+    if (planMatches(plan, current)) return null;
     await client.setChargePeriods(
       serial,
       plan.powerRate,
       plan.stopSOC,
       ...plan.slots,
     );
-    return true;
+    return describePeriods(current);
   });
 };
 
 // Builds the plan from the user's Octopus slots, and only goes to the
 // inverter (slow, and Growatt's API is unofficial) if the plan isn't what it
 // last had, it hasn't been read for a while, or force. reached: it did.
+// replaced: the times the inverter had, if it wrote; null if it didn't.
 const sync = async (
   userId: string,
   settings: Settings,
@@ -160,8 +162,12 @@ const sync = async (
     state.inverter_checked_at !== null &&
     Date.now() - state.inverter_checked_at.getTime() < RECHECK_MS;
   if (!force && isRecent && isKnownPlan(state, plan))
-    return { plan, reached: false, applied: false };
-  return { plan, reached: true, applied: await applyToInverter(growatt, plan) };
+    return { plan, reached: false, replaced: null };
+  return {
+    plan,
+    reached: true,
+    replaced: await applyToInverter(growatt, plan),
+  };
 };
 
 // Automatic charging: builds the plan from the user's Octopus slots and sets
@@ -175,12 +181,13 @@ const checkCharge = async (
   req: VercelRequest | null,
 ): Promise<{ outcome: AutomationOutcome; paused: boolean }> => {
   try {
-    const { plan, reached, applied } = await sync(
+    const { plan, reached, replaced } = await sync(
       userId,
       settings,
       state,
       trigger === "check_now",
     );
+    const applied = replaced !== null;
     await withUser(userId, async (tx) => {
       await tx`
         update private.automation_state set
@@ -194,7 +201,8 @@ const checkCharge = async (
             plan_slots = ${describePlan(plan)}, inverter_checked_at = now(),
             applied_at = case when ${applied} then now() else applied_at end`;
       // Changes to the inverter always go in the audit log; a quiet check
-      // only when it ends a run of failures.
+      // only when it ends a run of failures. added/ended/removed say what
+      // changed, compared with what the inverter had.
       if (applied)
         await audit(tx, req, userId, "automation_run", {
           result: "applied",
@@ -203,6 +211,7 @@ const checkCharge = async (
           stopSOC: plan.stopSOC,
           slots: describePlan(plan),
           skipped: plan.skipped,
+          ...diffPlan(replaced, describePlan(plan)),
         });
       else if (state.last_code)
         await audit(tx, req, userId, "automation_run", {
