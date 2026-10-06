@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router";
 import useOctopus from "./useOctopus";
 import useApplySlots from "./useApplySlots";
 import CheckNow from "./CheckNow";
@@ -6,6 +7,7 @@ import InfoTip from "../../components/InfoTip";
 import Spinner from "../../components/Spinner";
 import useSettings from "../settings/useSettings";
 import useToast from "../../contexts/useToast";
+import { windowCover } from "../../lib/chargePlan";
 import type { OctopusProps } from "../../types/Octopus";
 
 // canApply: false until the user has saved their Growatt login. With automatic
@@ -49,6 +51,11 @@ const Octopus = ({ canApply }: OctopusProps) => {
   }, [extraSlotsMessage, showToast]);
 
   const slots = slotsData?.plannedDispatches ?? [];
+  // How much of each slot the user's own window covers. Covered times aren't
+  // written as separate slots, so the inverter can differ from this list.
+  const covers = slots.map((s) =>
+    settings ? windowCover(s, settings) : "none",
+  );
 
   return (
     <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
@@ -136,6 +143,8 @@ const Octopus = ({ canApply }: OctopusProps) => {
                 <span className="text-gray-500 font-normal">
                   {" · "}
                   {formatDay(item.startDt)}
+                  {covers[index] === "all" && " · in your window"}
+                  {covers[index] === "part" && " · partly in your window"}
                 </span>
               </span>
               <span className="text-sm font-mono text-gray-100">
@@ -143,6 +152,17 @@ const Octopus = ({ canApply }: OctopusProps) => {
               </span>
             </div>
           ))}
+          {settings && covers.some((c) => c !== "none") && (
+            <p className="text-xs text-gray-400">
+              Times inside your charge window ({settings.chargeStart}–
+              {settings.chargeEnd}) aren&apos;t added to your inverter as
+              separate slots, because the window already charges your battery
+              then. Only the rest of each slot is added.{" "}
+              <Link to="/settings" className="underline hover:text-gray-200">
+                Change the window in Settings
+              </Link>
+            </p>
+          )}
         </div>
       )}
 
