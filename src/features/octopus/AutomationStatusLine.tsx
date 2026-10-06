@@ -20,7 +20,7 @@ const formatUkTime = (iso: string) => {
   return `${dayMonth} ${time}`;
 };
 
-// What automatic charging last did, under the Check now button.
+// What automatic charging last did, under the Sync now button.
 const AutomationStatusLine = ({ status }: AutomationStatusLineProps) => {
   if (!status) return null;
 

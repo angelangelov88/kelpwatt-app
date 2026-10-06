@@ -440,7 +440,7 @@ const check = async (
 ): Promise<AutomationOutcome> => {
   const settings = await withUser(userId, readSettings);
   const { automationEnabled, exportEveryDay } = settings;
-  // A one-off is only turned off by the schedule: Check now's reply is about
+  // A one-off is only turned off by the schedule: Sync now's reply is about
   // automatic charging.
   const scheduled = trigger === "schedule";
   if (
@@ -452,7 +452,7 @@ const check = async (
   const state = await takeLease(userId);
   if (!state) return { result: "busy", plan: null };
   try {
-    // Check now runs even when paused: the user may have fixed the login elsewhere.
+    // Sync now runs even when paused: the user may have fixed the login elsewhere.
     if (state.paused && trigger === "schedule")
       return { result: "paused", plan: null };
 
@@ -496,7 +496,7 @@ const check = async (
 // the charge plan, and sets the inverter if it differs; and after Growatt's
 // 23:30 reset, puts their export times back. The scheduled check
 // skips paused users and trusts what it last saw on the inverter for up to 3
-// hours; Check now always reads the inverter. req: the user's request, for the
+// hours; Sync now always reads the inverter. req: the user's request, for the
 // audit log's IP (null for the schedule). Never throws.
 const checkUser = async (
   userId: string,

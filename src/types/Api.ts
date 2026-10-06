@@ -122,7 +122,7 @@ type AutomationStatus = {
   // Why the last check failed, or null if it worked.
   error: { code: string; message: string } | null;
   // A saved login was refused, so scheduled checks wait for new details or
-  // Check now.
+  // Sync now.
   paused: boolean;
   // The charge times the inverter was last set to or found with, e.g.
   // "01:00-05:00, 18:00-19:00"; "" for none.
@@ -131,7 +131,7 @@ type AutomationStatus = {
   appliedAt: string | null;
 };
 
-// POST /api/automation (Check now). busy: another check was already running.
+// POST /api/automation (Sync now). busy: another check was already running.
 // plan: what the inverter now has, when the check got that far.
 type CheckNowResult = {
   result: "applied" | "unchanged" | "failed" | "busy";

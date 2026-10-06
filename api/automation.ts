@@ -12,7 +12,7 @@ import { readAutomationStatus } from "./_lib/userData";
 export const config = { maxDuration: 60 };
 
 // GET → AutomationStatus: what automatic charging last did.
-// POST → CheckNowResult. Check now: the same check as the 5-minute schedule,
+// POST → CheckNowResult. Sync now: the same check as the 5-minute schedule,
 //   but it always reads the inverter, and runs even when paused.
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (!allowMethods(req, res, ["GET", "POST"]) || !checkOrigin(req, res))

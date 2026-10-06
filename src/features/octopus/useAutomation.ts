@@ -7,8 +7,8 @@ import { CHARGE_KEY, toPeriods } from "../growatt/useGrowatt";
 
 const AUTOMATION_KEY = ["automation"];
 
-// What automatic charging last did, and the Check now button. Only used while
-// automation is on. onChecked runs after every Check now that reached the
+// What automatic charging last did, and the Sync now button. Only used while
+// automation is on. onChecked runs after every Sync now that reached the
 // server, e.g. to refresh the Octopus slots shown.
 const useAutomation = ({ onChecked }: { onChecked: () => void }) => {
   const queryClient = useQueryClient();
@@ -35,17 +35,17 @@ const useAutomation = ({ onChecked }: { onChecked: () => void }) => {
           "success",
         );
       } else if (result === "unchanged")
-        showToast("Checked: the inverter is already up to date", "success");
+        showToast("Synced: the inverter is already up to date", "success");
       else if (result === "busy")
-        showToast("A check is already running, try again in a minute", "info");
+        showToast("A sync is already running, try again in a minute", "info");
       else
         showToast(
-          `Check failed: ${status.error?.message ?? "something went wrong"}`,
+          `Sync failed: ${status.error?.message ?? "something went wrong"}`,
           "error",
         );
     },
     onError: (error) => {
-      showToast(`Check failed: ${error.message}`, "error");
+      showToast(`Sync failed: ${error.message}`, "error");
     },
   });
 

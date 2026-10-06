@@ -9,7 +9,7 @@ import useToast from "../../contexts/useToast";
 import type { OctopusProps } from "../../types/Octopus";
 
 // canApply: false until the user has saved their Growatt login. With automatic
-// charging on, Check now replaces the Apply button.
+// charging on, Sync now replaces the Apply button.
 const Octopus = ({ canApply }: OctopusProps) => {
   const {
     slotsLoading,
@@ -69,7 +69,7 @@ const Octopus = ({ canApply }: OctopusProps) => {
                     <b>Refresh</b> gets the latest times from Octopus.
                   </li>
                   <li>
-                    <b>Check now</b> runs that check straight away, for example
+                    <b>Sync now</b> does the same straight away, for example
                     just after you plug in your car.
                   </li>
                 </ul>
