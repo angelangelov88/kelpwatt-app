@@ -123,35 +123,64 @@ const onInverter = async <T>(step: () => Promise<T>) => {
   try {
     return await step();
   } catch (err) {
+    if (err instanceof AutomationError) throw err;
     if (err instanceof GrowattDeadlineError) throw tooSlow();
     throw new AutomationError("growatt_failed", growattMessage(err));
   }
 };
 
 // Reads the inverter's charge times and writes the plan unless it's already
-// there. Returns the times it replaced (describePeriods) if it wrote, else null.
+// there, then reads them back: Growatt accepts a write the inverter can still
+// drop (slots 4–6 especially, sent 3s after 1–3). replaced: the times it
+// replaced (describePeriods) if it wrote, else null. verified: the inverter
+// was seen with the plan. A read-back that doesn't match throws, so the next
+// check writes again; one that fails or runs out of time doesn't, as the
+// write most likely worked, but leaves it unverified.
+// Reads skip slots 4–6 unless 1–3 are all on, as Kelpwatt fills slots in
+// order. readAll reads them anyway, to catch ones set by hand in ShineServer
+// with a gap in 1–3 (a write clears them). The read-back also reads them when
+// they were on before: then a dropped "off" for them would leave old slots
+// behind. If they were off, a dropped write leaves them off.
 const applyToInverter = async (
   { client, serial }: Growatt,
   plan: ChargePlan,
-): Promise<string | null> => {
+  readAll: boolean,
+): Promise<{ replaced: string | null; verified: boolean }> => {
   await logIn(client);
   return onInverter(async () => {
-    const current = await client.fetchChargePeriods(serial);
-    if (planMatches(plan, current)) return null;
+    const current = await client.fetchChargePeriods(serial, readAll);
+    if (planMatches(plan, current)) return { replaced: null, verified: true };
     await client.setChargePeriods(
       serial,
       plan.powerRate,
       plan.stopSOC,
       ...plan.slots,
     );
-    return describePeriods(current);
+    const replaced = describePeriods(current);
+    const had46 = [current.period4, current.period5, current.period6].some(
+      (p) => p.enabled,
+    );
+    let after: Awaited<ReturnType<typeof client.fetchChargePeriods>>;
+    try {
+      after = await client.fetchChargePeriods(serial, had46);
+    } catch {
+      return { replaced, verified: false };
+    }
+    if (!planMatches(plan, after))
+      throw new AutomationError(
+        "growatt_not_kept",
+        "The inverter didn't keep the new charge times",
+      );
+    return { replaced, verified: true };
   });
 };
 
 // Builds the plan from the user's Octopus slots, and only goes to the
 // inverter (slow, and Growatt's API is unofficial) if the plan isn't what it
-// last had, it hasn't been read for a while, or force. reached: it did.
+// last had, it hasn't been read for a while, or force. Those last two read all
+// six slots, the plan changing doesn't (3s faster). reached: it did.
 // replaced: the times the inverter had, if it wrote; null if it didn't.
+// verified: the inverter was seen with the plan (false if not reached).
 const sync = async (
   userId: string,
   settings: Settings,
@@ -176,11 +205,11 @@ const sync = async (
     state.inverter_checked_at !== null &&
     Date.now() - state.inverter_checked_at.getTime() < RECHECK_MS;
   if (!force && isRecent && isKnownPlan(state, plan))
-    return { plan, reached: false, replaced: null };
+    return { plan, reached: false, replaced: null, verified: false };
   return {
     plan,
     reached: true,
-    replaced: await applyToInverter(growatt, plan),
+    ...(await applyToInverter(growatt, plan, force || !isRecent)),
   };
 };
 
@@ -196,7 +225,7 @@ const checkCharge = async (
   deadline: number,
 ): Promise<{ outcome: AutomationOutcome; paused: boolean }> => {
   try {
-    const { plan, reached, replaced } = await sync(
+    const { plan, reached, replaced, verified } = await sync(
       userId,
       settings,
       state,
@@ -214,7 +243,8 @@ const checkCharge = async (
           update private.automation_state set
             plan_power = ${Number(plan.powerRate)},
             plan_stop = ${Number(plan.stopSOC)},
-            plan_slots = ${describePlan(plan)}, inverter_checked_at = now(),
+            plan_slots = ${describePlan(plan)},
+            inverter_checked_at = case when ${verified} then now() end,
             applied_at = case when ${applied} then now() else applied_at end`;
       // Changes to the inverter always go in the audit log; a quiet check
       // only when it ends a run of failures. added/ended/removed say what

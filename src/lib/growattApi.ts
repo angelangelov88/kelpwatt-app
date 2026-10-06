@@ -217,11 +217,12 @@ const createGrowattClient = ({
   };
 
   // Periods 1-3 plus rate/SOC come from the first param (19 values); 4-6 from the second (9 values),
-  // which is only read when 1-3 are all enabled.
+  // which is only read when 1-3 are all enabled, or with all (to check 4-6 are off).
   const readPeriods = async (
     serial: string,
     paramId13: string,
     paramId46: string,
+    all = false,
   ): Promise<ChargePeriods> => {
     await ensureLoggedIn();
     const first = await readParam(serial, paramId13, 19);
@@ -229,7 +230,7 @@ const createGrowattClient = ({
     const p1 = safe(v1, 10),
       p2 = safe(v1, 13),
       p3 = safe(v1, 16);
-    const hasMore = p1.enabled && p2.enabled && p3.enabled;
+    const hasMore = all || (p1.enabled && p2.enabled && p3.enabled);
     let v2: number[] = [];
     if (hasMore) {
       await readDelay();
@@ -289,12 +290,14 @@ const createGrowattClient = ({
 
     fetchBatterySoc,
 
-    fetchChargePeriods: (serial: string): Promise<ChargePeriods> =>
+    // all: also read slots 4–6 when 1–3 aren't all on (3s slower).
+    fetchChargePeriods: (serial: string, all = false): Promise<ChargePeriods> =>
       enqueue(() =>
         readPeriods(
           serial,
           "mix_ac_charge_time_multi",
           "mix_ac_charge_time_multi_1",
+          all,
         ),
       ),
 
