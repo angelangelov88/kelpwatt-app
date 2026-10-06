@@ -5,7 +5,7 @@ import { automationUserIds } from "../../_lib/db";
 import { allowMethods, sendError } from "../../_lib/http";
 
 // Users run in parallel. Most checks stop after asking Octopus (1–2s); one
-// that writes the inverter takes 25–35s.
+// that writes the inverter takes 20–30s.
 const CONCURRENCY = 5;
 
 // GET with Authorization: Bearer <CRON_SECRET> → CronSummary. One automation

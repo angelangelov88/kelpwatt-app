@@ -20,8 +20,12 @@ const formatUkTime = (iso: string) => {
   return `${dayMonth} ${time}`;
 };
 
-// What automatic charging last did, under the Check now button.
-const AutomationStatusLine = ({ status }: AutomationStatusLineProps) => {
+// What automatic charging last did, under the Sync now button. isStale: the
+// checks seem to have stopped.
+const AutomationStatusLine = ({
+  status,
+  isStale,
+}: AutomationStatusLineProps) => {
   if (!status) return null;
 
   if (status.paused)
@@ -43,10 +47,18 @@ const AutomationStatusLine = ({ status }: AutomationStatusLineProps) => {
 
   return (
     <div className="flex flex-col gap-1 text-xs text-gray-400">
-      <p>
-        Last checked {formatUkTime(status.checkedAt)}. Checked again every 5
-        minutes.
-      </p>
+      {isStale ? (
+        <p role="status" className="text-amber-400">
+          Automatic charging hasn&apos;t run since{" "}
+          {formatUkTime(status.checkedAt)}, so your inverter may not have your
+          latest Octopus slots. Press Sync now to try straight away.
+        </p>
+      ) : (
+        <p>
+          Last checked {formatUkTime(status.checkedAt)}. Checked again every 5
+          minutes.
+        </p>
+      )}
       {status.error && (
         <p className="text-red-400">
           That check failed: {status.error.message}. It will try again at the

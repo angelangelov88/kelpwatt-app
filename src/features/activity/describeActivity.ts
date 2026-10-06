@@ -74,7 +74,7 @@ const providerName = (details: unknown) =>
 
 const describeAutomation = (details: unknown): ActivityDescription => {
   const trigger =
-    text(details, "trigger") === "check_now" ? "Check now" : "Scheduled check";
+    text(details, "trigger") === "check_now" ? "Sync now" : "Scheduled check";
   switch (text(details, "result")) {
     case "applied": {
       const skipped = number(details, "skipped") ?? 0;

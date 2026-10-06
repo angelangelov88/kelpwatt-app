@@ -142,6 +142,26 @@ const buildChargePlan = (
   };
 };
 
+// How much of an Octopus slot the user's own window already covers: "all"
+// (left out of the plan), "part" (trimmed to the rest) or "none".
+const windowCover = (
+  dispatch: Dispatch,
+  settings: ChargeSettings,
+): "all" | "part" | "none" => {
+  if (!settings.windowEnabled) return "none";
+  const length = (pieces: Piece[]) =>
+    pieces.reduce((sum, p) => sum + p.end - p.start, 0);
+  const pieces = toPieces(dispatch);
+  const outside = pieces.flatMap(
+    outsideWindow(
+      toMinutes(settings.chargeStart),
+      toMinutes(settings.chargeEnd),
+    ),
+  );
+  if (length(outside) === length(pieces)) return "none";
+  return length(outside) === 0 ? "all" : "part";
+};
+
 const formatSlot = (s: NonNullable<SlotParam>) =>
   `${s.startHour}:${s.startMin}-${s.endHour}:${s.endMin}`;
 
@@ -201,4 +221,5 @@ export {
   describePeriods,
   diffPlan,
   planMatches,
+  windowCover,
 };

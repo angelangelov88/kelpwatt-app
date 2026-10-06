@@ -93,7 +93,10 @@ type OctopusProps = { canApply: boolean };
 type CheckNowProps = { onChecked: () => void };
 
 // undefined while loading.
-type AutomationStatusLineProps = { status: AutomationStatus | undefined };
+type AutomationStatusLineProps = {
+  status: AutomationStatus | undefined;
+  isStale: boolean;
+};
 
 type SectionHeadingProps = { children: string };
 

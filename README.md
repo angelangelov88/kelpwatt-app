@@ -19,7 +19,7 @@ The logo shows energy flowing into a battery (the violet arrow) and back out to 
   - **Charge battery** and **Export to grid**: the inverter's Battery First (charge) and Grid First (discharge) slots, editable
   - two Export to grid preset buttons (by default High Export, 18:00–19:00, and Low Export, 20:00–22:15)
   - **Export until battery %**: reads the battery % and sets one export slot, from now until the battery reaches the chosen level (aiming 2% above it), worked out from the battery details in Settings. The 5-minute check turns it off once it ends
-  - Octopus's planned dispatches, with an Apply button that turns them into a charge plan (or, with automatic charging on, Check now and when it last ran)
+  - Octopus's planned dispatches, with an Apply button that turns them into a charge plan (or, with automatic charging on, Sync now and when it last ran)
   - saving sessions, with Join
 - **Settings:**
   - Growatt and Octopus details (checked before saving, write-only)
@@ -72,7 +72,7 @@ api/                    Vercel functions (9 of the Hobby plan's 12)
   octopus/[action].ts   slots, sessions, join
   credentials.ts        save, check and remove Growatt / Octopus details
   settings.ts           charge window, power rate, stop SOC, automation
-  automation.ts         automatic charging status, Check now
+  automation.ts         automatic charging status, Sync now
   account.ts            data export, activity log, account deletion
   cron/[action].ts      user (one user's scheduled check), update (everyone, by hand)
   contact.ts            the contact form (emails hello@angelov.uk through Resend)
@@ -287,9 +287,9 @@ Supabase's `pg_cron` runs `private.schedule_automation()` every 5 minutes. It se
 3. compares it with the plan last seen on the inverter (`private.automation_state`). If it's the same and the inverter was read in the last 3 hours, it stops there, without contacting Growatt
 4. otherwise reads the inverter and writes the plan if it differs
 
-A "busy" mark (90 seconds) stops two checks for the same user running at once. If Growatt or Octopus refuses the saved login, the user's checks pause until they save new details or press Check now, so a wrong password isn't retried 288 times a day. Changes to the inverter are written to the audit log, and failures only when they start and stop.
+A "busy" mark (90 seconds) stops two checks for the same user running at once. If Growatt or Octopus refuses the saved login, the user's checks pause until they save new details or press Sync now, so a wrong password isn't retried 288 times a day. Changes to the inverter are written to the audit log, and failures only when they start and stop.
 
-**Check now** on the dashboard (`POST /api/automation`) runs the same check straight away and always reads the inverter. A manual change to Battery First, or saving settings or details, makes the next check read the inverter too.
+**Sync now** on the dashboard (`POST /api/automation`) runs the same check straight away and always reads the inverter. A manual change to Battery First, or saving settings or details, makes the next check read the inverter too.
 
 A second job, `housekeeping`, runs daily at 03:17 UTC. It deletes audit log entries older than 12 months and `pg_cron`'s own run history older than 7 days.
 

@@ -44,6 +44,9 @@ type GrowattConfig = {
   buildUrl: (path: string) => string;
   // Log each reply (never the login one).
   debug?: boolean;
+  // When to stop calling Growatt (epoch ms), so a check ends before its
+  // function is stopped. No limit if left out.
+  deadline?: number;
 };
 
 // A slot as edited in the form.

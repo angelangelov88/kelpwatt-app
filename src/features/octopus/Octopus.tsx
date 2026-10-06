@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "react-router";
 import useOctopus from "./useOctopus";
 import useApplySlots from "./useApplySlots";
 import CheckNow from "./CheckNow";
@@ -6,10 +7,11 @@ import InfoTip from "../../components/InfoTip";
 import Spinner from "../../components/Spinner";
 import useSettings from "../settings/useSettings";
 import useToast from "../../contexts/useToast";
+import { windowCover } from "../../lib/chargePlan";
 import type { OctopusProps } from "../../types/Octopus";
 
 // canApply: false until the user has saved their Growatt login. With automatic
-// charging on, Check now replaces the Apply button.
+// charging on, Sync now replaces the Apply button.
 const Octopus = ({ canApply }: OctopusProps) => {
   const {
     slotsLoading,
@@ -26,6 +28,7 @@ const Octopus = ({ canApply }: OctopusProps) => {
     settingsError,
     planSummary,
     extraSlotsMessage,
+    isApplied,
     isPending,
   } = useApplySlots({ slotsData });
   const { data: settings } = useSettings();
@@ -49,6 +52,11 @@ const Octopus = ({ canApply }: OctopusProps) => {
   }, [extraSlotsMessage, showToast]);
 
   const slots = slotsData?.plannedDispatches ?? [];
+  // How much of each slot the user's own window covers. Covered times aren't
+  // written as separate slots, so the inverter can differ from this list.
+  const covers = slots.map((s) =>
+    settings ? windowCover(s, settings) : "none",
+  );
 
   return (
     <div className="rounded-2xl bg-gray-900 border border-gray-800 p-6">
@@ -69,7 +77,7 @@ const Octopus = ({ canApply }: OctopusProps) => {
                     <b>Refresh</b> gets the latest times from Octopus.
                   </li>
                   <li>
-                    <b>Check now</b> runs that check straight away, for example
+                    <b>Sync now</b> does the same straight away, for example
                     just after you plug in your car.
                   </li>
                 </ul>
@@ -136,6 +144,8 @@ const Octopus = ({ canApply }: OctopusProps) => {
                 <span className="text-gray-500 font-normal">
                   {" · "}
                   {formatDay(item.startDt)}
+                  {covers[index] === "all" && " · in your window"}
+                  {covers[index] === "part" && " · partly in your window"}
                 </span>
               </span>
               <span className="text-sm font-mono text-gray-100">
@@ -143,6 +153,17 @@ const Octopus = ({ canApply }: OctopusProps) => {
               </span>
             </div>
           ))}
+          {settings && covers.some((c) => c !== "none") && (
+            <p className="text-xs text-gray-400">
+              Times inside your charge window ({settings.chargeStart}–
+              {settings.chargeEnd}) aren&apos;t added to your inverter as
+              separate slots, because the window already charges your battery
+              then. Only the rest of each slot is added.{" "}
+              <Link to="/settings" className="underline hover:text-gray-200">
+                Change the window in Settings
+              </Link>
+            </p>
+          )}
         </div>
       )}
 
@@ -164,16 +185,18 @@ const Octopus = ({ canApply }: OctopusProps) => {
           </p>
           <button
             onClick={applySlots}
-            disabled={isPending || !canBuildPlan}
+            disabled={isPending || !canBuildPlan || isApplied}
             className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {isPending
               ? "Applying…"
-              : slots.length > 0
-                ? "Apply Slots to Growatt"
-                : settings?.windowEnabled === false
-                  ? "Clear Growatt Charge Slots"
-                  : "Apply My Window to Growatt"}
+              : isApplied
+                ? "Already on your inverter"
+                : slots.length > 0
+                  ? "Apply Slots to Growatt"
+                  : settings?.windowEnabled === false
+                    ? "Clear Growatt Charge Slots"
+                    : "Apply My Window to Growatt"}
           </button>
         </>
       )}

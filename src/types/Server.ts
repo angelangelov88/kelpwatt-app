@@ -62,7 +62,7 @@ type AuditAction =
 
 // What an automation check did for one user. skipped: automation is off.
 // busy: another check for them was running. paused: a saved login was
-// refused, so only Check now or new details restart it.
+// refused, so only Sync now or new details restart it.
 type AutomationResult =
   | "applied"
   | "unchanged"
