@@ -9,7 +9,7 @@ import { requireUser } from "./_lib/session";
 import { readAutomationStatus } from "./_lib/userData";
 
 // A check that writes the inverter takes 25–35s.
-export const maxDuration = 60;
+export const config = { maxDuration: 60 };
 
 // GET → AutomationStatus: what automatic charging last did.
 // POST → CheckNowResult. Check now: the same check as the 5-minute schedule,
