@@ -308,7 +308,7 @@ const createGrowattClient = ({
           param17: p3?.endMin ?? "00",
           param18: p3 ? "1" : "0",
         });
-        if (!p4 && !p5 && !p6) return;
+        // Always, even with nothing in slots 4–6, to turn off what's there.
         await writeDelay();
         await request("/tcpSet.do", {
           action: "mixSet",
@@ -353,7 +353,7 @@ const createGrowattClient = ({
           param16: p3?.endMin ?? "00",
           param17: p3 ? "1" : "0",
         });
-        if (!p4 && !p5 && !p6) return;
+        // Always, even with nothing in slots 4–6, to turn off what's there.
         await writeDelay();
         await request("/tcpSet.do", {
           action: "mixSet",
