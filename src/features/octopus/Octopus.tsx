@@ -28,6 +28,7 @@ const Octopus = ({ canApply }: OctopusProps) => {
     settingsError,
     planSummary,
     extraSlotsMessage,
+    isApplied,
     isPending,
   } = useApplySlots({ slotsData });
   const { data: settings } = useSettings();
@@ -184,16 +185,18 @@ const Octopus = ({ canApply }: OctopusProps) => {
           </p>
           <button
             onClick={applySlots}
-            disabled={isPending || !canBuildPlan}
+            disabled={isPending || !canBuildPlan || isApplied}
             className="w-full px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             {isPending
               ? "Applying…"
-              : slots.length > 0
-                ? "Apply Slots to Growatt"
-                : settings?.windowEnabled === false
-                  ? "Clear Growatt Charge Slots"
-                  : "Apply My Window to Growatt"}
+              : isApplied
+                ? "Already on your inverter"
+                : slots.length > 0
+                  ? "Apply Slots to Growatt"
+                  : settings?.windowEnabled === false
+                    ? "Clear Growatt Charge Slots"
+                    : "Apply My Window to Growatt"}
           </button>
         </>
       )}

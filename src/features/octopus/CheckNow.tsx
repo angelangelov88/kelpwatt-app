@@ -20,9 +20,9 @@ const CheckNow = ({ onChecked }: CheckNowProps) => {
         {isChecking ? "Syncing… (up to 30s)" : "Sync now"}
       </button>
       <p className="text-xs text-gray-400">
-        Gets your latest Octopus slots and updates your inverter&apos;s charge
-        times if they&apos;ve changed, without waiting for the next 5-minute
-        check.
+        We update your inverter&apos;s charge times from your Octopus slots
+        every 5 minutes. Sync now does it straight away, for example just after
+        you plug in your car.
       </p>
     </div>
   );
