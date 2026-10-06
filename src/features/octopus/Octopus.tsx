@@ -16,7 +16,8 @@ const Octopus = ({ canApply }: OctopusProps) => {
     slotsError,
     slotsErrorUpdatedAt,
     slotsData,
-    formatDate,
+    formatTime,
+    formatDay,
     fetchSlots,
   } = useOctopus();
   const {
@@ -132,9 +133,13 @@ const Octopus = ({ canApply }: OctopusProps) => {
             >
               <span className="text-xs text-gray-400 font-medium">
                 Slot {index + 1}
+                <span className="text-gray-500 font-normal">
+                  {" · "}
+                  {formatDay(item.startDt)}
+                </span>
               </span>
               <span className="text-sm font-mono text-gray-100">
-                {formatDate(item.startDt)} → {formatDate(item.endDt)}
+                {formatTime(item.startDt)}–{formatTime(item.endDt)}
               </span>
             </div>
           ))}
