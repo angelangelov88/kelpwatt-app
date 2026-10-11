@@ -49,6 +49,7 @@ type AuditAction =
   | "credentials_saved"
   | "credentials_deleted"
   | "credentials_check_failed"
+  | "credentials_check_unavailable"
   | "settings_saved"
   | "growatt_write"
   | "octopus_join"
@@ -61,6 +62,23 @@ type AuditAction =
   | "one_off_ended"
   | "automatic_export_saved"
   | "automatic_export_run";
+
+// Which call of a credentials check went wrong: Growatt's login or the
+// inverter read with the serial, Octopus's API key or the account number.
+type CredentialStep = "login" | "inverter" | "key" | "account";
+
+// How Growatt or Octopus didn't answer: no reply in time, no connection, or a
+// reply that wasn't the expected JSON (a web page, say).
+type OutageKind = "timeout" | "network" | "unexpected_reply" | "other";
+
+// Why a credentials check failed. outage: Growatt or Octopus didn't answer, so
+// it says nothing about the credentials and doesn't count as a failed check.
+type CredentialProblem = {
+  code: string;
+  message: string;
+  step: CredentialStep;
+  outage?: OutageKind;
+};
 
 // What tonight's Automatic export did, in its audit entries. exported: the
 // slot was set. The rest skipped it: the car was plugged in, a one-off export
@@ -135,6 +153,9 @@ export type {
   GoogleLogin,
   Handler,
   AuditAction,
+  CredentialStep,
+  OutageKind,
+  CredentialProblem,
   AutomaticExportResult,
   AutomationResult,
   AutomationOutcome,

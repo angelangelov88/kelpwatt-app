@@ -67,6 +67,19 @@ const CHECK_FAILURES: Record<string, string> = {
   octopus_account_failed: "The account number didn't match the API key",
 };
 
+// Growatt or Octopus didn't answer: at which call, and how.
+const UNAVAILABLE_STEPS: Record<string, string> = {
+  login: "Growatt didn't answer the login",
+  inverter: "Logged in, but the inverter didn't answer",
+  key: "Octopus didn't answer the API key check",
+  account: "Octopus didn't answer the account check",
+};
+const OUTAGE_KINDS: Record<string, string> = {
+  timeout: "no reply in time",
+  network: "couldn't connect",
+  unexpected_reply: "an unexpected reply",
+};
+
 const SAVED = { growatt: "Growatt login", octopus: "Octopus API key" };
 
 const providerName = (details: unknown) =>
@@ -249,6 +262,16 @@ const describeActivity = ({
             ? "Octopus didn't accept the details you entered"
             : "Growatt didn't accept the details you entered",
         detail: CHECK_FAILURES[text(details, "reason") ?? ""],
+        failed: true,
+      };
+    // Growatt or Octopus didn't answer, so the details weren't checked.
+    case "credentials_check_unavailable":
+      return {
+        title: `Couldn't check your ${providerName(details)}`,
+        detail: join([
+          UNAVAILABLE_STEPS[text(details, "step") ?? ""],
+          OUTAGE_KINDS[text(details, "outage") ?? ""],
+        ]),
         failed: true,
       };
     case "settings_saved": {
