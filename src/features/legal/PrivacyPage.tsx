@@ -46,15 +46,19 @@ const PrivacyPage = () => (
         <li>
           <strong className="text-gray-100">Your settings:</strong> your charge
           window and whether it&apos;s used, charge power, battery stop level
-          and whether automatic charging is on, and the theme you chose (light,
-          dark or your device&apos;s setting).
+          and whether automatic charging is on, your Automatic export settings
+          (whether it&apos;s on, its time, discharge rate, stop level and
+          minimum battery level), and the theme you chose (light, dark or your
+          device&apos;s setting).
         </li>
         <li>
           <strong className="text-gray-100">Automatic charging status:</strong>{" "}
           if you turn automatic charging on, the charge times, power and stop
           level last set on your inverter, when it was last checked and last
           changed, and why the last check failed, if it did. We keep these so we
-          only change your inverter when your plan changes.
+          only change your inverter when your plan changes. If you turn
+          Automatic export on, the last day it ran and why tonight&apos;s last
+          try failed, if it did, so it runs at most once an evening.
         </li>
         <li>
           <strong className="text-gray-100">An activity log:</strong> a record
@@ -64,8 +68,10 @@ const PrivacyPage = () => (
           off, saving, removing or failing to verify your Growatt or Octopus
           details, saving settings, changes sent to your inverter, saving
           sessions you join, automatic charging checks that changed your
-          inverter, started failing or started working again, and downloads of
-          your data. It never contains passwords or keys. You can read it on the
+          inverter, started failing or started working again, each
+          evening&apos;s Automatic export (when it started or why it was
+          skipped, with your battery level at the time), and downloads of your
+          data. It never contains passwords or keys. You can read it on the
           Activity page.
         </li>
         <li>

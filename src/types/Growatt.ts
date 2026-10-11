@@ -85,6 +85,10 @@ type ExportUntilPlan =
       capped: boolean;
     };
 
+// Where tonight's Automatic export is. due: a check should try to start it.
+// late: too late to start it, but a failure is still logged. wait: neither.
+type AutomaticExportStatus = "due" | "late" | "wait";
+
 export type {
   SlotParam,
   PeriodsInput,
@@ -97,4 +101,5 @@ export type {
   Snapshot,
   ExportUntilInput,
   ExportUntilPlan,
+  AutomaticExportStatus,
 };

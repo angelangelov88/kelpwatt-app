@@ -1,4 +1,5 @@
 import {
+  defaultAutomaticExport,
   defaultExportPresets,
   defaultSettings,
 } from "../../src/lib/settingsSchema";
@@ -27,6 +28,11 @@ type SettingsRow = {
   keep_export: boolean;
   battery_kwh: number | null;
   battery_max_kw: number | null;
+  automatic_export: boolean;
+  automatic_export_at: string | null;
+  automatic_export_power: number | null;
+  automatic_export_stop: number | null;
+  automatic_export_min_soc: number | null;
 } & Record<`${Preset}_export_${"name" | "start" | "end"}`, string | null> &
   Record<`${Preset}_export_${"power" | "stop"}`, number | null>;
 
@@ -53,6 +59,8 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
       -- numeric comes back as a string otherwise.
       battery_kwh::float8 as battery_kwh,
       battery_max_kw::float8 as battery_max_kw,
+      automatic_export, automatic_export_at::text as automatic_export_at,
+      automatic_export_power, automatic_export_stop, automatic_export_min_soc,
       theme
     from private.user_settings`;
   const row = rows.at(0);
@@ -76,6 +84,14 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
     automationEnabled: row?.automation_enabled ?? false,
     exportPresets: { high: preset("high"), low: preset("low") },
     exportEveryDay: row?.keep_export ?? false,
+    automaticExport: {
+      enabled: row?.automatic_export ?? false,
+      at: row?.automatic_export_at?.slice(0, 5) ?? defaultAutomaticExport.at,
+      powerRate:
+        row?.automatic_export_power ?? defaultAutomaticExport.powerRate,
+      stopSOC: row?.automatic_export_stop ?? defaultAutomaticExport.stopSOC,
+      minSOC: row?.automatic_export_min_soc ?? defaultAutomaticExport.minSOC,
+    },
     batteryKwh: row?.battery_kwh ?? null,
     maxDischargeKw: row?.battery_max_kw ?? null,
     theme: row?.theme ?? "system",

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LATEST_START } from "./automaticExport";
 
 // Shared by /api/settings and the settings form.
 
@@ -66,6 +67,30 @@ const exportPresetsSchema = z.object({
 // dashboard back after Growatt clears them each night.
 const dailyExportSchema = z.object({ enabled: z.boolean() });
 
+// PUT /api/settings?part=automatic: Export until battery % every evening, at
+// a UK time in 5-minute steps (the check runs every 5 minutes).
+const automaticExportSchema = z
+  .object({
+    enabled: z.boolean(),
+    at: timeSchema
+      .refine((t) => Number(t.slice(3, 5)) % 5 === 0, {
+        message: "Use steps of 5 minutes",
+      })
+      .refine((t) => t <= LATEST_START, {
+        message: `No later than ${LATEST_START}`,
+      }),
+    // Discharge power, percent of the inverter's maximum.
+    powerRate: stepSchema,
+    // Stop exporting at this battery level, in percent.
+    stopSOC: stepSchema,
+    // Only start if the battery is at least this full, in percent.
+    minSOC: stepSchema,
+  })
+  .refine((s) => s.minSOC > s.stopSOC, {
+    message: "Must be above the stop level",
+    path: ["minSOC"],
+  });
+
 // PUT /api/settings?part=battery: what the Export until battery % button
 // works the end time out from. Growatt doesn't give either.
 const batterySchema = z.object({
@@ -96,6 +121,14 @@ const defaultSettings: z.infer<typeof settingsSchema> = {
   automationEnabled: false,
 };
 
+const defaultAutomaticExport: z.infer<typeof automaticExportSchema> = {
+  enabled: false,
+  at: "21:00",
+  powerRate: 95,
+  stopSOC: 20,
+  minSOC: 50,
+};
+
 const defaultExportPresets: z.infer<typeof exportPresetsSchema> = {
   high: {
     name: "High Export",
@@ -119,8 +152,10 @@ export {
   settingsSchema,
   exportPresetsSchema,
   dailyExportSchema,
+  automaticExportSchema,
   batterySchema,
   themeSchema,
   defaultSettings,
   defaultExportPresets,
+  defaultAutomaticExport,
 };

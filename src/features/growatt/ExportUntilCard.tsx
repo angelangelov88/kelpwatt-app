@@ -61,6 +61,7 @@ const ExportUntilCard = ({
   const maxDischargeKw = settings?.maxDischargeKw ?? null;
   const hasBattery = batteryKwh !== null && maxDischargeKw !== null;
   const isEveryDay = settings?.exportEveryDay ?? false;
+  const automatic = settings?.automaticExport;
   const isReading = batteryRead.isPending;
   const isApplying = setDischargeMutation.isPending;
   const isExportBusy = reader.isReading || isApplying;
@@ -246,6 +247,21 @@ const ExportUntilCard = ({
           One export time, ending before the battery runs down
         </p>
       </div>
+
+      {/* Unlike automatic charging, it doesn't lock the card: a one-off still
+          running at that time just makes tonight's skip. */}
+      {automatic?.enabled && (
+        <p className="-mt-2 mb-4 text-xs text-amber-400">
+          Automatic export runs this every evening at {automatic.at}:{" "}
+          {automatic.powerRate}% discharge rate, stop at {automatic.stopSOC}%,
+          if the battery is at least {automatic.minSOC}%. If an export you start
+          here is still running then, that evening&apos;s is skipped.{" "}
+          <Link to="/settings" className="text-violet-400 hover:underline">
+            Change it in Settings
+          </Link>
+          .
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>

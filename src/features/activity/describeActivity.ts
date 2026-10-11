@@ -67,6 +67,19 @@ const CHECK_FAILURES: Record<string, string> = {
   octopus_account_failed: "The account number didn't match the API key",
 };
 
+// Growatt or Octopus didn't answer: at which call, and how.
+const UNAVAILABLE_STEPS: Record<string, string> = {
+  login: "Growatt didn't answer the login",
+  inverter: "Logged in, but the inverter didn't answer",
+  key: "Octopus didn't answer the API key check",
+  account: "Octopus didn't answer the account check",
+};
+const OUTAGE_KINDS: Record<string, string> = {
+  timeout: "no reply in time",
+  network: "couldn't connect",
+  unexpected_reply: "an unexpected reply",
+};
+
 const SAVED = { growatt: "Growatt login", octopus: "Octopus API key" };
 
 const providerName = (details: unknown) =>
@@ -120,6 +133,71 @@ const describeAutomation = (details: unknown): ActivityDescription => {
       };
     default:
       return { title: "Automatic charging ran", failed: false };
+  }
+};
+
+// What tonight's Automatic export did: started, skipped (and why) or failed.
+const describeAutomaticExport = (details: unknown): ActivityDescription => {
+  const at = text(details, "at");
+  const soc = number(details, "soc");
+  const skipped = (reason: string | undefined) => ({
+    title: "Automatic export skipped",
+    detail: join([at && `Set for ${at}`, reason]),
+    failed: false,
+  });
+  switch (text(details, "result")) {
+    case "exported":
+      return {
+        title: "Automatic export started",
+        detail: join([
+          formatSlots(text(details, "slot"), "no export times"),
+          soc !== undefined && `from ${String(soc)}%`,
+          ...powerAndStop(details),
+          flag(details, "capped") &&
+            `cut short to end before Growatt's ${GROWATT_RESET} reset`,
+        ]),
+        failed: false,
+      };
+    case "car_plugged_in":
+      return skipped("Your car was plugged in");
+    case "busy":
+      return skipped("An Export until battery % was already running");
+    case "low_battery": {
+      const min = number(details, "minSOC");
+      return skipped(
+        soc !== undefined && min !== undefined
+          ? `The battery was at ${String(soc)}%, below your ${String(min)}% minimum`
+          : "The battery was below your minimum",
+      );
+    }
+    case "already":
+      return skipped(
+        soc !== undefined
+          ? `The battery was already at ${String(soc)}%, near your stop level`
+          : "The battery was already near your stop level",
+      );
+    case "too_late":
+      return skipped(`Too close to Growatt's ${GROWATT_RESET} reset`);
+    case "too_short": {
+      const minutes = number(details, "minutes");
+      return skipped(
+        minutes !== undefined
+          ? `It would only have lasted ${String(minutes)} minute${minutes === 1 ? "" : "s"}`
+          : "It would have been too short",
+      );
+    }
+    case "failed":
+      return {
+        title: "Automatic export didn't run",
+        detail: join([
+          at && `Set for ${at}`,
+          text(details, "message"),
+          flag(details, "paused") && "Update your saved login in Settings",
+        ]),
+        failed: true,
+      };
+    default:
+      return { title: "Automatic export ran", failed: false };
   }
 };
 
@@ -184,6 +262,16 @@ const describeActivity = ({
             ? "Octopus didn't accept the details you entered"
             : "Growatt didn't accept the details you entered",
         detail: CHECK_FAILURES[text(details, "reason") ?? ""],
+        failed: true,
+      };
+    // Growatt or Octopus didn't answer, so the details weren't checked.
+    case "credentials_check_unavailable":
+      return {
+        title: `Couldn't check your ${providerName(details)}`,
+        detail: join([
+          UNAVAILABLE_STEPS[text(details, "step") ?? ""],
+          OUTAGE_KINDS[text(details, "outage") ?? ""],
+        ]),
         failed: true,
       };
     case "settings_saved": {
@@ -302,6 +390,23 @@ const describeActivity = ({
               : "The export times had already changed, so they were left alone",
             failed: false,
           };
+    case "automatic_export_saved": {
+      const at = text(details, "at");
+      const min = number(details, "minSOC");
+      return {
+        title: "Automatic export settings saved",
+        detail: join([
+          flag(details, "enabled") ? "On" : "Off",
+          at && `every evening at ${at}`,
+          ...powerAndStop(details),
+          min !== undefined && `only from ${String(min)}%`,
+        ]),
+        failed: false,
+      };
+    }
+    // The 5-minute check, at the time chosen for Automatic export.
+    case "automatic_export_run":
+      return describeAutomaticExport(details);
     case "automation_run":
       return describeAutomation(details);
     default:
