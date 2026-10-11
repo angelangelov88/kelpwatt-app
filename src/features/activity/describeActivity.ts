@@ -123,6 +123,71 @@ const describeAutomation = (details: unknown): ActivityDescription => {
   }
 };
 
+// What tonight's Automatic export did: started, skipped (and why) or failed.
+const describeAutomaticExport = (details: unknown): ActivityDescription => {
+  const at = text(details, "at");
+  const soc = number(details, "soc");
+  const skipped = (reason: string | undefined) => ({
+    title: "Automatic export skipped",
+    detail: join([at && `Set for ${at}`, reason]),
+    failed: false,
+  });
+  switch (text(details, "result")) {
+    case "exported":
+      return {
+        title: "Automatic export started",
+        detail: join([
+          formatSlots(text(details, "slot"), "no export times"),
+          soc !== undefined && `from ${String(soc)}%`,
+          ...powerAndStop(details),
+          flag(details, "capped") &&
+            `cut short to end before Growatt's ${GROWATT_RESET} reset`,
+        ]),
+        failed: false,
+      };
+    case "car_plugged_in":
+      return skipped("Your car was plugged in");
+    case "busy":
+      return skipped("An Export until battery % was already running");
+    case "low_battery": {
+      const min = number(details, "minSOC");
+      return skipped(
+        soc !== undefined && min !== undefined
+          ? `The battery was at ${String(soc)}%, below your ${String(min)}% minimum`
+          : "The battery was below your minimum",
+      );
+    }
+    case "already":
+      return skipped(
+        soc !== undefined
+          ? `The battery was already at ${String(soc)}%, near your stop level`
+          : "The battery was already near your stop level",
+      );
+    case "too_late":
+      return skipped(`Too close to Growatt's ${GROWATT_RESET} reset`);
+    case "too_short": {
+      const minutes = number(details, "minutes");
+      return skipped(
+        minutes !== undefined
+          ? `It would only have lasted ${String(minutes)} minute${minutes === 1 ? "" : "s"}`
+          : "It would have been too short",
+      );
+    }
+    case "failed":
+      return {
+        title: "Automatic export didn't run",
+        detail: join([
+          at && `Set for ${at}`,
+          text(details, "message"),
+          flag(details, "paused") && "Update your saved login in Settings",
+        ]),
+        failed: true,
+      };
+    default:
+      return { title: "Automatic export ran", failed: false };
+  }
+};
+
 // "High Export 18:00–19:00, 95%, stop at 20%", from highName, highStart…
 const describePreset = (details: unknown, key: "high" | "low") => {
   const start = text(details, `${key}Start`);
@@ -302,6 +367,23 @@ const describeActivity = ({
               : "The export times had already changed, so they were left alone",
             failed: false,
           };
+    case "automatic_export_saved": {
+      const at = text(details, "at");
+      const min = number(details, "minSOC");
+      return {
+        title: "Automatic export settings saved",
+        detail: join([
+          flag(details, "enabled") ? "On" : "Off",
+          at && `every evening at ${at}`,
+          ...powerAndStop(details),
+          min !== undefined && `only from ${String(min)}%`,
+        ]),
+        failed: false,
+      };
+    }
+    // The 5-minute check, at the time chosen for Automatic export.
+    case "automatic_export_run":
+      return describeAutomaticExport(details);
     case "automation_run":
       return describeAutomation(details);
     default:

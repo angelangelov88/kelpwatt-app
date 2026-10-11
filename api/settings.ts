@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { hasPassed } from "../src/lib/automaticExport";
+import { ukDay } from "../src/lib/dailyExport";
 import {
+  automaticExportSchema,
   batterySchema,
   dailyExportSchema,
   exportPresetsSchema,
@@ -33,6 +36,9 @@ const presetDetails = ({ high, low }: ExportPresets) =>
 //   leaves everything else alone.
 // PUT ?part=daily DailyExport → Settings. Turns Export every day on or off;
 //   on needs Growatt credentials. Leaves everything else alone.
+// PUT ?part=automatic AutomaticExport → Settings. Export until battery %
+//   every evening; on needs Growatt and Octopus credentials and the battery
+//   details. Leaves everything else alone.
 // PUT ?part=battery BatteryInfo → Settings. Battery size and max discharge
 //   power, for Export until battery %. Leaves everything else alone.
 // PUT ?part=theme ThemeSetting → Settings. Light, dark or the device's
@@ -188,6 +194,71 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         409,
         "credentials_missing",
         "Save your Growatt details before turning on Export every day",
+      );
+      return;
+    }
+    res.json(saved);
+    return;
+  }
+
+  if (req.query.part === "automatic") {
+    const automatic = automaticExportSchema.safeParse(req.body);
+    if (!automatic.success) {
+      sendError(
+        res,
+        400,
+        "invalid_input",
+        automatic.error.issues[0]?.message ?? "Invalid input",
+      );
+      return;
+    }
+    const { enabled, at, powerRate, stopSOC, minSOC } = automatic.data;
+    const saved = await withUser(userId, async (tx) => {
+      if (enabled) {
+        const credentials = await tx<{ provider: string }[]>`
+          select provider from private.user_credentials`;
+        const battery = await tx`
+          select from private.user_settings
+          where battery_kwh is not null and battery_max_kw is not null`;
+        const has = (provider: string) =>
+          credentials.some((c) => c.provider === provider);
+        if (!has("growatt") || !has("octopus") || battery.length === 0)
+          return null;
+      }
+      await tx`
+        insert into private.user_settings
+          (user_id, automatic_export, automatic_export_at,
+            automatic_export_power, automatic_export_stop,
+            automatic_export_min_soc)
+        values (${userId}, ${enabled}, ${at}, ${powerRate}, ${stopSOC},
+          ${minSOC})
+        on conflict (user_id) do update set
+          automatic_export = excluded.automatic_export,
+          automatic_export_at = excluded.automatic_export_at,
+          automatic_export_power = excluded.automatic_export_power,
+          automatic_export_stop = excluded.automatic_export_stop,
+          automatic_export_min_soc = excluded.automatic_export_min_soc`;
+      // Saved after today's time: it starts tomorrow, not straight away. A
+      // failure from an earlier try is forgotten.
+      if (enabled)
+        await tx`
+          insert into private.automation_state as s
+            (user_id, automatic_export_on)
+          values (${userId},
+            ${hasPassed(at) ? ukDay(new Date()) : null}::date)
+          on conflict (user_id) do update set
+            automatic_export_on =
+              coalesce(excluded.automatic_export_on, s.automatic_export_on),
+            automatic_export_code = null, automatic_export_message = null`;
+      await audit(tx, req, userId, "automatic_export_saved", automatic.data);
+      return readSettings(tx);
+    });
+    if (!saved) {
+      sendError(
+        res,
+        409,
+        "setup_missing",
+        "Save your Growatt and Octopus details and your battery details before turning on Automatic export",
       );
       return;
     }

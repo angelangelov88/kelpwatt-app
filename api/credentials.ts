@@ -152,10 +152,11 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       const deleted = await tx`
         delete from private.user_credentials where provider = ${provider.data}`;
       if (deleted.count > 0) {
-        // Automation needs both, so it stops rather than failing every run.
-        // Export every day needs Growatt.
+        // Automation and Automatic export need both, so they stop rather than
+        // failing every run. Export every day needs Growatt.
         await tx`
           update private.user_settings set automation_enabled = false,
+            automatic_export = false,
             keep_export = keep_export and ${provider.data !== "growatt"}`;
         await audit(tx, req, userId, "credentials_deleted", {
           provider: provider.data,

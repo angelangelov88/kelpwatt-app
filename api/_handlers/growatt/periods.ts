@@ -201,4 +201,4 @@ const periodsHandler =
     res.status(204).end();
   };
 
-export { growattMessage, isOutage, periodsHandler };
+export { growattMessage, isOutage, periodsHandler, startOneOff, toSlotParam };

@@ -4,6 +4,6 @@
 const OPERATOR = "Angel Angelov";
 const CONTACT_EMAIL = "privacy@angelov.uk";
 const SITE = "kelpwatt.angelov.uk";
-const LAST_UPDATED = "1 October 2026";
+const LAST_UPDATED = "11 October 2026";
 
 export { OPERATOR, CONTACT_EMAIL, SITE, LAST_UPDATED };

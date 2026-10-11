@@ -17,6 +17,7 @@ import type { joinSchema } from "../lib/octopusSchemas";
 import type {
   batterySchema,
   dailyExportSchema,
+  automaticExportSchema,
   exportPresetsSchema,
   settingsSchema,
   themeSchema,
@@ -98,6 +99,10 @@ type Preset = keyof ExportPresets;
 // PUT /api/settings?part=daily: Export every day on or off.
 type DailyExport = z.infer<typeof dailyExportSchema>;
 
+// PUT /api/settings?part=automatic: Export until battery % every evening at
+// a set time.
+type AutomaticExport = z.infer<typeof automaticExportSchema>;
+
 // PUT /api/settings?part=battery: battery size and max discharge power.
 type BatteryInfo = z.infer<typeof batterySchema>;
 
@@ -111,6 +116,7 @@ type Theme = ThemeSetting["theme"];
 type Settings = ChargeSettings & {
   exportPresets: ExportPresets;
   exportEveryDay: boolean;
+  automaticExport: AutomaticExport;
   theme: Theme;
 } & { [K in keyof BatteryInfo]: BatteryInfo[K] | null };
 
@@ -211,6 +217,7 @@ export type {
   ExportPreset,
   Preset,
   DailyExport,
+  AutomaticExport,
   BatteryInfo,
   ThemeSetting,
   Theme,

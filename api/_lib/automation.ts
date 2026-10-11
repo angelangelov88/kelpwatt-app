@@ -1,5 +1,10 @@
 import type { VercelRequest } from "@vercel/node";
 import {
+  MIN_EXPORT_MIN,
+  automaticExportStatus,
+  isCarPluggedIn,
+} from "../../src/lib/automaticExport";
+import {
   buildChargePlan,
   describePeriods,
   describePlan,
@@ -7,6 +12,7 @@ import {
   planMatches,
 } from "../../src/lib/chargePlan";
 import { resetDay, ukDay } from "../../src/lib/dailyExport";
+import { planExportUntil } from "../../src/lib/exportUntil";
 import { GrowattDeadlineError } from "../../src/lib/growattApi";
 import {
   OctopusError,
@@ -16,13 +22,19 @@ import {
 import type { Settings } from "../../src/types/Api";
 import type { ChargePlan } from "../../src/types/Octopus";
 import type {
+  AutomaticExportResult,
   AutomationOutcome,
   AutomationResult,
   AutomationStateRow,
   AutomationTrigger,
   Tx,
 } from "../../src/types/Server";
-import { growattMessage, isOutage } from "../_handlers/growatt/periods";
+import {
+  growattMessage,
+  isOutage,
+  startOneOff,
+  toSlotParam,
+} from "../_handlers/growatt/periods";
 import { octopusMessage } from "../_handlers/octopus/connect";
 import { audit } from "./audit";
 import { withUser } from "./db";
@@ -66,7 +78,9 @@ const takeLease = async (userId: string) => {
       returning plan_power, plan_stop, plan_slots, inverter_checked_at,
         last_code, paused, export_restored_on::text as export_restored_on,
         export_failed_on::text as export_failed_on, one_off_until,
-        one_off_slot, one_off_failed`,
+        one_off_slot, one_off_failed,
+        automatic_export_on::text as automatic_export_on,
+        automatic_export_code, automatic_export_message`,
   );
   return rows.at(0) ?? null;
 };
@@ -478,9 +492,146 @@ const endOneOff = async (
   }
 };
 
-// Runs whichever of automatic charging and Export every day the user has on,
-// and turns off an ended Export until battery % slot, holding the lease so
-// only one check talks to their inverter at a time.
+// Automatic export: tonight's Export until battery %, from the battery level
+// now. Skipped if a one-off export is still running, the car is plugged in
+// (Intelligent Octopus has charging planned), the battery is below the
+// minimum, or the export would be too short; every run and skip goes in the
+// audit log, and marks tonight done. A failure is kept and tried again next
+// check (giveUpAutomaticExport logs it once it's too late); a refused login or
+// missing details aren't retried, so the account can't get locked.
+// paused: that login was refused, so nothing else should try it this check.
+const runAutomaticExport = async (
+  userId: string,
+  settings: Settings,
+  state: AutomationStateRow,
+  req: VercelRequest | null,
+  deadline: number,
+): Promise<{ result: AutomationResult; paused: boolean }> => {
+  const { at, powerRate, stopSOC, minSOC } = settings.automaticExport;
+  const { batteryKwh, maxDischargeKw } = settings;
+  const markDone = (tx: Tx) => tx`
+    update private.automation_state set
+      automatic_export_on = ${ukDay(new Date())}::date,
+      automatic_export_code = null, automatic_export_message = null`;
+  const log = (
+    tx: Tx,
+    result: AutomaticExportResult,
+    details: Record<string, string | number | boolean | null> = {},
+  ) =>
+    audit(tx, req, userId, "automatic_export_run", { result, at, ...details });
+  const skip = async (
+    result: AutomaticExportResult,
+    details: Record<string, string | number | boolean | null> = {},
+  ) => {
+    await withUser(userId, async (tx) => {
+      await markDone(tx);
+      await log(tx, result, details);
+    });
+    return { result: "unchanged" as const, paused: false };
+  };
+  try {
+    if (state.one_off_until && state.one_off_until.getTime() > Date.now())
+      return await skip("busy", { slot: state.one_off_slot });
+    const [octopus, growatt] = await Promise.all([
+      loadOctopus(userId),
+      loadGrowatt(userId, deadline),
+    ]);
+    if (!octopus || !growatt || batteryKwh === null || maxDischargeKw === null)
+      throw new AutomationError(
+        "not_set_up",
+        "Your Growatt, Octopus or battery details are missing",
+      );
+    const dispatches = await fetchDispatches(octopus.apiKey, octopus.account);
+    if (isCarPluggedIn(dispatches)) return await skip("car_plugged_in");
+    const { client, serial } = growatt;
+    await logIn(client);
+    const soc = await onInverter(() => client.fetchBatterySoc(serial));
+    if (soc < minSOC) return await skip("low_battery", { soc, minSOC });
+    const plan = planExportUntil({
+      soc,
+      powerRate,
+      stopSOC,
+      batteryKwh,
+      maxDischargeKw,
+    });
+    if (plan.kind === "already") return await skip("already", { soc, stopSOC });
+    if (plan.kind === "tooLate") return await skip("too_late", { soc });
+    if (plan.minutes < MIN_EXPORT_MIN)
+      return await skip("too_short", { soc, minutes: plan.minutes });
+    const slot = { start: plan.start, end: plan.end };
+    await onInverter(() =>
+      client.setDischargePeriods(
+        serial,
+        String(powerRate),
+        String(stopSOC),
+        toSlotParam(slot),
+      ),
+    );
+    await withUser(userId, async (tx) => {
+      // The check turns the slot off once it ends, as for the dashboard's.
+      await startOneOff(tx, userId, slot);
+      await markDone(tx);
+      await log(tx, "exported", {
+        soc,
+        slot: `${slot.start}-${slot.end}`,
+        powerRate,
+        stopSOC,
+        capped: plan.capped,
+      });
+    });
+    return { result: "applied", paused: false };
+  } catch (err) {
+    const failure =
+      err instanceof AutomationError
+        ? err
+        : new AutomationError("internal", "Something went wrong on our side");
+    console.error(
+      `automatic export failed for ${userId.slice(0, 8)}:`,
+      failure.code,
+    );
+    await withUser(userId, async (tx) => {
+      if (failure.pause || failure.code === "not_set_up") {
+        await markDone(tx);
+        await log(tx, "failed", {
+          code: failure.code,
+          message: failure.message,
+          paused: failure.pause,
+        });
+      } else
+        await tx`
+          update private.automation_state set
+            automatic_export_code = ${failure.code},
+            automatic_export_message = ${failure.message.slice(0, 300)}`;
+    });
+    return { result: "failed", paused: failure.pause };
+  }
+};
+
+// Automatic export, once it's too late to start tonight's: marks tonight done
+// and logs why the last try failed, or that no check got to it.
+const giveUpAutomaticExport = (
+  userId: string,
+  settings: Settings,
+  state: AutomationStateRow,
+  req: VercelRequest | null,
+) =>
+  withUser(userId, async (tx) => {
+    await tx`
+      update private.automation_state set
+        automatic_export_on = ${ukDay(new Date())}::date,
+        automatic_export_code = null, automatic_export_message = null`;
+    await audit(tx, req, userId, "automatic_export_run", {
+      result: "failed",
+      at: settings.automaticExport.at,
+      code: state.automatic_export_code ?? "not_started",
+      message:
+        state.automatic_export_message ?? "It couldn't be started in time",
+    });
+  });
+
+// Runs whichever of automatic charging, Export every day and Automatic export
+// the user has on, and turns off an ended Export until battery % slot, holding
+// the lease so only one check talks to their inverter at a time.
 const check = async (
   userId: string,
   trigger: AutomationTrigger,
@@ -488,13 +639,18 @@ const check = async (
   deadline: number,
 ): Promise<AutomationOutcome> => {
   const settings = await withUser(userId, readSettings);
-  const { automationEnabled, exportEveryDay } = settings;
-  // A one-off is only turned off by the schedule: Sync now's reply is about
-  // automatic charging.
+  const { automationEnabled, exportEveryDay, automaticExport } = settings;
+  // A one-off is only turned off, and Automatic export only run, by the
+  // schedule: Sync now's reply is about automatic charging.
   const scheduled = trigger === "schedule";
+  const exportStatus =
+    scheduled && automaticExport.enabled
+      ? automaticExportStatus(automaticExport.at)
+      : "wait";
   if (
     !automationEnabled &&
     !exportEveryDay &&
+    exportStatus === "wait" &&
     !(scheduled && (await hasOneOff(userId)))
   )
     return { result: "skipped", plan: null };
@@ -517,6 +673,24 @@ const check = async (
       const ended = await endOneOff(userId, state, req, deadline);
       outcome = { result: ended.result, plan: null };
       canWrite = ended.result !== "applied" && !ended.paused;
+    }
+    if (
+      exportStatus !== "wait" &&
+      state.automatic_export_on !== ukDay(new Date())
+    ) {
+      if (exportStatus === "late")
+        await giveUpAutomaticExport(userId, settings, state, req);
+      else if (canWrite) {
+        const run = await runAutomaticExport(
+          userId,
+          settings,
+          state,
+          req,
+          deadline,
+        );
+        if (!automationEnabled) outcome = { result: run.result, plan: null };
+        canWrite = run.result !== "applied" && !run.paused;
+      }
     }
     let canRestore = canWrite;
     if (automationEnabled && canWrite) {
@@ -549,8 +723,9 @@ const check = async (
 };
 
 // One automation check for one user: asks Octopus for their slots, works out
-// the charge plan, and sets the inverter if it differs; and after Growatt's
-// 23:30 reset, puts their export times back. The scheduled check
+// the charge plan, and sets the inverter if it differs; after Growatt's
+// 23:30 reset, puts their export times back; and in the evening starts
+// Automatic export. The scheduled check
 // skips paused users and trusts what it last saw on the inverter for up to 3
 // hours; Sync now always reads the inverter. req: the user's request, for the
 // audit log's IP (null for the schedule). Never throws.

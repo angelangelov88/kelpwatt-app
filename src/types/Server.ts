@@ -58,7 +58,25 @@ type AuditAction =
   | "daily_export_saved"
   | "export_restored"
   | "battery_saved"
-  | "one_off_ended";
+  | "one_off_ended"
+  | "automatic_export_saved"
+  | "automatic_export_run";
+
+// What tonight's Automatic export did, in its audit entries. exported: the
+// slot was set. The rest skipped it: the car was plugged in, a one-off export
+// was already running (busy), the battery was below the minimum, already at
+// the stop level, too close to Growatt's 23:30 reset or the export would have
+// been too short; failed: Octopus or Growatt didn't respond in time, or a
+// login was refused.
+type AutomaticExportResult =
+  | "exported"
+  | "car_plugged_in"
+  | "busy"
+  | "low_battery"
+  | "already"
+  | "too_late"
+  | "too_short"
+  | "failed";
 
 // What an automation check did for one user. skipped: automation is off.
 // busy: another check for them was running. paused: a saved login was
@@ -99,6 +117,11 @@ type AutomationStateRow = {
   one_off_until: Date | null;
   one_off_slot: string | null;
   one_off_failed: boolean;
+  // Automatic export: the UK date (YYYY-MM-DD) it last ran, was skipped or
+  // given up on; and why tonight's last try failed, null if it hasn't.
+  automatic_export_on: string | null;
+  automatic_export_code: string | null;
+  automatic_export_message: string | null;
 };
 
 // The /api/cron/update reply. Counts only: GitHub Actions logs are public.
@@ -112,6 +135,7 @@ export type {
   GoogleLogin,
   Handler,
   AuditAction,
+  AutomaticExportResult,
   AutomationResult,
   AutomationOutcome,
   AutomationTrigger,
