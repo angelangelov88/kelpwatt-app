@@ -45,6 +45,22 @@ const router = createBrowserRouter([
       { path: "/contact", element: <ContactPage /> },
       { path: "/privacy", element: <PrivacyPage /> },
       { path: "/terms", element: <TermsPage /> },
+      // Loaded when first opened, so the Markdown renderer and the articles
+      // stay out of the main bundle.
+      {
+        path: "/blog",
+        lazy: () =>
+          import("./features/blog/BlogListPage").then((m) => ({
+            Component: m.default,
+          })),
+      },
+      {
+        path: "/blog/:slug",
+        lazy: () =>
+          import("./features/blog/BlogPostPage").then((m) => ({
+            Component: m.default,
+          })),
+      },
       { path: "*", element: <Navigate to="/" replace /> },
     ],
   },

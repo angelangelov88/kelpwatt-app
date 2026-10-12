@@ -80,10 +80,11 @@ api/                    Vercel functions (9 of the Hobby plan's 12)
   _handlers/            the handlers behind the [action] routes (not routed)
   _lib/                 session, CSRF, rate limits, crypto, database, audit log…
 src/
-  features/             auth, dashboard, growatt, octopus, settings, activity, about, legal
+  features/             auth, dashboard, growatt, octopus, settings, activity, about, legal, blog
   components/           shared UI
   lib/                  React-free code shared with the server (Growatt/Octopus clients, charge planner, schemas)
   types/                all TypeScript types
+content/blog/           the blog's articles, in Markdown
 supabase/migrations/    SQL migrations, applied by hand in order
 scripts/                local and CI checks
 .github/workflows/      CI and a manual automation run
@@ -356,6 +357,22 @@ If a secret leaks:
 The **privacy notice** (`/privacy`) and **terms** (`/terms`) live in `src/features/legal/`. The operator's name, contact address and "last updated" date are in `legalInfo.ts`. The **about** (`/about`) and **contact** (`/contact`) pages are in `src/features/about/`, with `hello@angelov.uk` and the GitHub links in `src/lib/contactInfo.ts`.
 
 If the app starts collecting new data, keeping it longer, or sending it to a new service, update the privacy notice in the same PR.
+
+## Blog
+
+The articles at `/blog` are Markdown files in `content/blog/`, shown by `src/features/blog/` (loaded only when the blog is opened). The file name is the address: `getting-started.md` is `/blog/getting-started`, so use lowercase words joined by hyphens. Each file starts with:
+
+```md
+---
+title: The headline
+description: One sentence for the list page and search results.
+date: 2026-10-12
+---
+```
+
+To add one, add the file and a line for it in `public/sitemap.xml`. Raw HTML in the Markdown shows as plain text and never runs. Links to `/…` stay in the app.
+
+To post an article on Medium as well, use Medium's **Import a story** with the article's address. That sets the canonical link to the original, so search engines credit kelpwatt.angelov.uk rather than treating it as a copy.
 
 ## Before opening sign-up to everyone
 

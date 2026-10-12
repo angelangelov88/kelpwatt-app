@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The public pages. Add a line for each new post in content/blog/. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://kelpwatt.angelov.uk/about</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/blog</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/blog/getting-started</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/blog/ev-intelligent-octopus</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/blog/growatt-import-export</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/blog/export-until-battery</loc></url>
+  <url><loc>https://kelpwatt.angelov.uk/signup</loc></url>
+</urlset>
