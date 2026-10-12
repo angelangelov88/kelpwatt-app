@@ -4,7 +4,7 @@ description: Intelligent Octopus moves your car's cheap charging slots around. K
 date: 2026-10-12
 ---
 
-If you have an electric car, a Growatt home battery and Intelligent Octopus Go, you've probably seen this: you plug the car in, Octopus gives it a cheap charging slot in the evening, and your home battery happily empties itself into the car at exactly the moment grid power is cheapest.
+If you have an electric car, a Growatt home battery and Intelligent Octopus Go, you've probably seen this: you plug the car in, Octopus gives it a cheap charging slot in the evening, and your home battery happily empties itself into the car before the cheap night period.
 
 ## Why it happens
 
@@ -26,12 +26,13 @@ You plug the car in whenever it suits you and let Octopus choose the times.
 
 You'll need a Kelpwatt account with your Growatt login and your Octopus API key saved. [Getting started](/blog/getting-started) walks through it.
 
-1. Open **Settings → Battery charging settings** and choose:
-   - **Charge power:** how much of the inverter's power to charge from the grid with.
-   - **Stop at battery:** the level where grid charging stops.
-   - **Charge in my own window:** see below.
-2. Press **Save battery charging settings**.
-3. In **Settings → Automatic charging**, turn on **Apply my Octopus slots to the inverter**.
+1. Open **Settings → Battery charging settings**. These are your default charging settings: Kelpwatt uses them for your nightly window and for every Octopus slot.
+2. Tick **Charge in my own window**. The **Charge from** and **Until** times only appear once it's ticked. Set them to your cheap night rate: 23:30–05:30 on Intelligent Octopus Go. (You can leave it unticked to charge only in Octopus's slots. See below.)
+3. Choose:
+   - **Charge power:** how much of the inverter's power to charge from the grid with. We recommend 60%: it's easier on your battery, and usually still fills it overnight.
+   - **Stop at battery:** the level where grid charging stops. We recommend 90%.
+4. Press **Save battery charging settings**. The button appears once you've changed something.
+5. In **Settings → Automatic charging**, turn on **Apply my Octopus slots to the inverter**.
 
 That's it. Within 5 minutes, the dashboard's Octopus card shows when it last checked and the charge times now on your inverter.
 
@@ -60,7 +61,7 @@ With automatic charging on, that button becomes **Sync now**, which checks strai
 
 ## When something goes wrong
 
-- If a check fails (for example, Growatt doesn't answer), the Octopus card says so and it tries again at the next check.
+- If a check fails (for example, Growatt doesn't answer), the Octopus Dispatch Slots card on Dashboard says so and it tries again at the next check.
 - If Growatt refuses your saved login, for example because you changed your Growatt password, automatic charging pauses so your Growatt account doesn't get locked. Update the login under **Settings → Growatt and Octopus** and it carries on.
 - The **Activity** page lists every change Kelpwatt made to your inverter, and every check that failed.
 
