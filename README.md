@@ -370,7 +370,7 @@ date: 2026-10-12
 ---
 ```
 
-To add one, add the file and a line for it in `public/sitemap.xml`. Raw HTML in the Markdown shows as plain text and never runs. Links to `/…` stay in the app.
+To add one, add the file and a line for it in `public/sitemap.xml`. Raw HTML in the Markdown shows as plain text and never runs. Link to other posts and pages by their full address (`https://kelpwatt.angelov.uk/…`), so the links still work when an article is copied elsewhere. The blog keeps those links, and `/…` ones, in the app.
 
 To post an article on Medium as well, use Medium's **Import a story** with the article's address. That sets the canonical link to the original, so search engines credit kelpwatt.angelov.uk rather than treating it as a copy.
 

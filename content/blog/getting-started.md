@@ -4,7 +4,7 @@ description: Create an account, add your Growatt login and (optionally) your Oct
 date: 2026-10-12
 ---
 
-Kelpwatt is a free web app that puts your Growatt home battery and your Octopus Energy account on one page. It can set your battery's charge and export times for you, follow the cheap charging slots Intelligent Octopus plans for your car, and export to the grid until your battery reaches a level you choose.
+[Kelpwatt](https://kelpwatt.angelov.uk) is a free web app that puts your Growatt home battery and your Octopus Energy account on one page. It can set your battery's charge and export times for you, follow the cheap charging slots Intelligent Octopus plans for your car, and export to the grid until your battery reaches a level you choose.
 
 This guide takes you from a new account to a working dashboard.
 
@@ -16,7 +16,7 @@ This guide takes you from a new account to a working dashboard.
 
 ## 1. Create your account
 
-1. Go to [Create an account](/signup).
+1. Go to [Create an account](https://kelpwatt.angelov.uk/signup).
 2. Sign up with Google, or with your email and a password. The password needs at least 10 characters, with upper and lowercase letters, a number and a symbol.
 3. If you used email, open the link we send you to finish creating your account.
 
@@ -24,7 +24,7 @@ This guide takes you from a new account to a working dashboard.
 
 The dashboard shows **Finish setting up** until this is done, because Kelpwatt can't read or change your inverter without it.
 
-1. Open **Settings** and scroll to **Growatt and Octopus**.
+1. In Kelpwatt, open **Settings** and scroll to **Growatt and Octopus**.
 2. Add your Growatt details:
    - **Growatt username:** the one you use for the ShinePhone app or server.growatt.com.
    - **Growatt password.**
@@ -110,9 +110,9 @@ These fill in the dashboard's **Apply my settings** button. With Octopus, automa
 
 ## What's next
 
-- [Stop your battery emptying into your EV on Intelligent Octopus](/blog/ev-intelligent-octopus)
-- [Charge and export your Growatt battery from one page](/blog/growatt-import-export)
-- [Export to the grid until your battery reaches a set level](/blog/export-until-battery)
+- [Stop your battery emptying into your EV on Intelligent Octopus](https://kelpwatt.angelov.uk/blog/ev-intelligent-octopus)
+- [Charge and export your Growatt battery from one page](https://kelpwatt.angelov.uk/blog/growatt-import-export)
+- [Export to the grid until your battery reaches a set level](https://kelpwatt.angelov.uk/blog/export-until-battery)
 
 Everything Kelpwatt does on your behalf, including every check that fails, is listed on the **Activity** page.
 

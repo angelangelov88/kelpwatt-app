@@ -5,8 +5,21 @@ import type { BlogMarkdownProps } from "../../types/Blog";
 
 const LINK = "text-violet-400 hover:underline";
 
+// Articles link to our pages by their full address, so the links still work
+// when an article is copied to Medium or elsewhere.
+const SITE_ORIGIN = "https://kelpwatt.angelov.uk";
+
+// The in-app path for a link to one of our pages, or null for another site.
+const toAppPath = (href: string) => {
+  if (href.startsWith("/")) return href;
+  if (href === SITE_ORIGIN) return "/";
+  if (href.startsWith(`${SITE_ORIGIN}/`)) return href.slice(SITE_ORIGIN.length);
+  return null;
+};
+
 // Our classes for each tag, in place of a typography plugin. Links to our own
-// pages stay in the app; others open in a new tab.
+// pages stay in the app, even on localhost or a preview; others open in a new
+// tab.
 const COMPONENTS: Components = {
   h2: ({ children }) => (
     <h2 className="mt-4 text-lg font-semibold text-strong">{children}</h2>
@@ -32,16 +45,18 @@ const COMPONENTS: Components = {
       {children}
     </code>
   ),
-  a: ({ href = "", children }) =>
-    href.startsWith("/") ? (
-      <Link to={href} className={LINK}>
-        {children}
-      </Link>
-    ) : (
+  a: ({ href = "", children }) => {
+    const path = toAppPath(href);
+    return path === null ? (
       <a href={href} target="_blank" rel="noopener noreferrer" className={LINK}>
         {children}
       </a>
-    ),
+    ) : (
+      <Link to={path} className={LINK}>
+        {children}
+      </Link>
+    );
+  },
 };
 
 // An article's Markdown as React elements. Raw HTML in the Markdown is left
