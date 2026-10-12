@@ -66,6 +66,13 @@ const AboutPage = () => (
         Now I plug the car in whenever it suits me and let Octopus choose the
         times.
       </p>
+      <p>
+        The{" "}
+        <Link to="/blog" className="text-violet-400 hover:underline">
+          blog
+        </Link>{" "}
+        has step-by-step guides to each of these.
+      </p>
     </LegalSection>
 
     <LegalSection title="Not with Octopus?">
