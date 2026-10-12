@@ -11,10 +11,12 @@ const BUTTON =
   "self-start px-4 py-2 rounded-xl text-sm font-medium text-white bg-violet-600 hover:bg-violet-500 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400";
 
 // One article. Open to everyone; the box at the end offers sign up, or the
-// dashboard to someone already signed in.
+// dashboard to someone signed in (past the authenticator step, if they use
+// one).
 const BlogPostPage = () => {
   const { slug = "" } = useParams();
-  const { me } = useAuth();
+  const { status } = useAuth();
+  const isSignedIn = status === "signedIn";
   const post = findPost(slug);
   usePageMeta(post?.title ?? "Post not found", post?.description ?? "");
 
@@ -56,15 +58,15 @@ const BlogPostPage = () => {
           id="blog-try-heading"
           className="text-base font-semibold text-strong"
         >
-          {me ? "Try it on your battery" : "Try Kelpwatt"}
+          {isSignedIn ? "Try it on your battery" : "Try Kelpwatt"}
         </h2>
         <p className="text-sm text-gray-400">
-          {me
+          {isSignedIn
             ? "Everything in this guide is on your dashboard and in Settings."
             : "Free, and works with just your Growatt account. Add Octopus whenever you like."}
         </p>
-        <Link to={me ? "/" : "/signup"} className={BUTTON}>
-          {me ? "Open your dashboard" : "Create an account"}
+        <Link to={isSignedIn ? "/" : "/signup"} className={BUTTON}>
+          {isSignedIn ? "Open your dashboard" : "Create an account"}
         </Link>
       </aside>
     </main>
