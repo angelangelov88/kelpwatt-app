@@ -6,6 +6,8 @@ date: 2026-10-12
 
 If you have an electric car, a Growatt home battery and Intelligent Octopus Go, you've probably seen this: you plug the car in, Octopus gives it a cheap charging slot in the evening, and your home battery happily empties itself into the car before the cheap night period.
 
+[Kelpwatt](https://kelpwatt.angelov.uk) is a free web app that connects your Growatt battery to your Octopus account, and it can stop this happening. Here's why it happens, and how to set it up.
+
 ## Why it happens
 
 When you plug in, Intelligent Octopus plans **dispatch slots**: extra cheap-rate times for charging your car, on top of the usual overnight window. Those slots change. One evening they can move several times between 7pm and 10pm, sometimes just minutes before they're due to start.
@@ -14,7 +16,7 @@ Your Growatt inverter knows nothing about them. Unless its **Battery First** cha
 
 ## What Kelpwatt does
 
-Kelpwatt connects your Octopus account to your Growatt inverter and does that switching for you.
+Kelpwatt reads your slots from Octopus and does that switching for you.
 
 - **Checks your Octopus slots every 5 minutes.**
 - **Sets your battery to charge from the grid during each slot**, so it charges at the cheap rate instead of draining into the car.
@@ -24,9 +26,9 @@ You plug the car in whenever it suits you and let Octopus choose the times.
 
 ## Set it up
 
-You'll need a Kelpwatt account with your Growatt login and your Octopus API key saved. [Getting started](/blog/getting-started) walks through it.
+You'll need a Kelpwatt account with your Growatt login and your Octopus API key saved. [Getting started](https://kelpwatt.angelov.uk/blog/getting-started) walks through it.
 
-1. Open **Settings → Battery charging settings**. These are your default charging settings: Kelpwatt uses them for your nightly window and for every Octopus slot.
+1. In Kelpwatt, open **Settings → Battery charging settings**. These are your default charging settings: Kelpwatt uses them for your nightly window and for every Octopus slot.
 2. Tick **Charge in my own window**. The **Charge from** and **Until** times only appear once it's ticked. Set them to your cheap night rate: 23:30–05:30 on Intelligent Octopus Go. (You can leave it unticked to charge only in Octopus's slots. See below.)
 3. Choose:
    - **Charge power:** how much of the inverter's power to charge from the grid with. We recommend 60%: it's easier on your battery, and usually still fills it overnight.
@@ -34,7 +36,7 @@ You'll need a Kelpwatt account with your Growatt login and your Octopus API key 
 4. Press **Save battery charging settings**. The button appears once you've changed something.
 5. In **Settings → Automatic charging**, turn on **Apply my Octopus slots to the inverter**.
 
-That's it. Within 5 minutes, the dashboard's Octopus card shows when it last checked and the charge times now on your inverter.
+That's it. Within 5 minutes, the Octopus card on Kelpwatt's dashboard shows when it last checked and the charge times now on your inverter.
 
 ## Your own window, or Octopus's slots only
 
@@ -67,6 +69,8 @@ With automatic charging on, that button becomes **Sync now**, which checks strai
 
 ## Saving sessions too
 
-With Octopus connected, the dashboard also shows today's **Power Down sessions**. Join one in a click, see your points, or press **Export during session** to fill in your export times for it. More on exporting in [Charge and export your Growatt battery from one page](/blog/growatt-import-export).
+With Octopus connected, the dashboard also shows today's **Power Down sessions**. Join one in a click, see your points, or press **Export during session** to fill in your export times for it. More on exporting in [Charge and export your Growatt battery from one page](https://kelpwatt.angelov.uk/blog/growatt-import-export).
+
+**Try it on your own battery:** Kelpwatt is free, and you only need your Growatt login to start. [Create an account](https://kelpwatt.angelov.uk/signup).
 
 _Kelpwatt isn't affiliated with Growatt or Octopus Energy._

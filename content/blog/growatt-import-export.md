@@ -4,11 +4,11 @@ description: Set your Growatt battery's grid charging (Battery First) and grid e
 date: 2026-10-12
 ---
 
-Changing charge and export times in the ShinePhone app or on Growatt's website takes a lot of taps, and the export times disappear every night. Kelpwatt puts both on one dashboard, and works with just your Growatt account. You don't need Octopus for anything in this guide.
+Changing charge and export times in the ShinePhone app or on Growatt's website takes a lot of taps, and the export times disappear every night. [Kelpwatt](https://kelpwatt.angelov.uk), a free web app, puts both on one dashboard, and works with just your Growatt account. You don't need Octopus for anything in this guide.
 
 ## Charge battery (Battery First)
 
-The **Charge battery** card shows when your battery charges from the grid. Use it for cheap-rate hours.
+The **Charge battery** card on Kelpwatt's dashboard shows when your battery charges from the grid. Use it for cheap-rate hours.
 
 1. Press **Load** to read what's on your inverter now.
 2. Change what you need:
@@ -28,7 +28,7 @@ Save your usual charge power, stop level and (optionally) a nightly window under
 
 Check the result, then press **Apply charge times**.
 
-If you use [automatic charging with Intelligent Octopus](/blog/ev-intelligent-octopus), Kelpwatt sets these times for you, and this card only shows them.
+If you use [automatic charging with Intelligent Octopus](https://kelpwatt.angelov.uk/blog/ev-intelligent-octopus), Kelpwatt sets these times for you, and this card only shows them.
 
 ## Export to grid (Grid First)
 
@@ -63,12 +63,14 @@ Turn on **Settings → Export to grid settings → Export every day** instead. A
 
 An export slot set by time alone has a problem. If the battery runs down before the slot ends, the inverter stays in Grid First and your home runs from the grid for the rest of it.
 
-The **Export to grid until battery %** card works out an end time from your battery level instead. It can run automatically every evening too. See [Export to the grid until your battery reaches a set level](/blog/export-until-battery).
+The **Export to grid until battery %** card works out an end time from your battery level instead. It can run automatically every evening too. See [Export to the grid until your battery reaches a set level](https://kelpwatt.angelov.uk/blog/export-until-battery).
 
 ## Check what happened
 
 Every change you apply, and everything Kelpwatt does for you, is listed on the **Activity** page.
 
-New here? Start with [Getting started](/blog/getting-started).
+New here? Start with [Getting started](https://kelpwatt.angelov.uk/blog/getting-started).
+
+**Try it on your own battery:** Kelpwatt is free, and you only need your Growatt login to start. [Create an account](https://kelpwatt.angelov.uk/signup).
 
 _Kelpwatt isn't affiliated with Growatt or Octopus Energy._

@@ -6,20 +6,20 @@ date: 2026-10-12
 
 Exporting from a Growatt battery by time has a catch. Set the slot too short and you leave paid-for energy in the battery. Set it too long and the battery hits its stop level early. The inverter then stays in Grid First, and your home runs from the grid for the rest of the slot.
 
-Kelpwatt's **Export to grid until battery %** works the other way round. You pick the level to stop at, and it works out when the battery gets there.
+[Kelpwatt](https://kelpwatt.angelov.uk) is a free web app for Growatt home batteries. Its **Export to grid until battery %** works the other way round: you pick the level to stop at, and it works out when the battery gets there.
 
 ## Before you start
 
-Kelpwatt needs two numbers that Growatt doesn't share. Add them under **Settings → Your battery**:
+Kelpwatt needs two numbers that Growatt doesn't share. Add them under Kelpwatt's **Settings → Your battery**:
 
 - **Battery size (kWh):** the usable capacity. If you have more than one battery, add them up.
 - **Max discharge power (kW):** export at a 100% rate and read the battery discharge power in the Growatt app.
 
-[Getting started](/blog/getting-started) explains both. You only need your Growatt login for this, not Octopus.
+[Getting started](https://kelpwatt.angelov.uk/blog/getting-started) explains both. You only need your Growatt login for this, not Octopus.
 
 ## Export once, now
 
-On the dashboard's **Export to grid until battery %** card:
+On Kelpwatt's dashboard, in the **Export to grid until battery %** card:
 
 1. Pick a **Discharge rate %** and a **Stop at battery %**.
 2. Press **Work out times**. Kelpwatt reads your battery level and shows the plan, for example: _Battery 86% → 20% at 95% discharge rate. Export 21:00–22:14 (1 h 14 min)._ Nothing has changed yet.
@@ -76,7 +76,9 @@ While it's on, the dashboard card also shows when it runs and with which setting
 
 ## Pairs well with
 
-- [Export every day](/blog/growatt-import-export), which puts your usual export times back after 23:30.
-- [Automatic charging on Intelligent Octopus](/blog/ev-intelligent-octopus), which fills the battery back up at the cheap rate overnight.
+- [Export every day](https://kelpwatt.angelov.uk/blog/growatt-import-export), which puts your usual export times back after 23:30.
+- [Automatic charging on Intelligent Octopus](https://kelpwatt.angelov.uk/blog/ev-intelligent-octopus), which fills the battery back up at the cheap rate overnight.
+
+**Try it on your own battery:** Kelpwatt is free, and you only need your Growatt login to start. [Create an account](https://kelpwatt.angelov.uk/signup).
 
 _Kelpwatt isn't affiliated with Growatt or Octopus Energy._
