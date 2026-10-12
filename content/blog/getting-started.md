@@ -28,10 +28,19 @@ The dashboard shows **Finish setting up** until this is done, because Kelpwatt c
 2. Add your Growatt details:
    - **Growatt username:** the one you use for the ShinePhone app or server.growatt.com.
    - **Growatt password.**
-   - **Inverter serial number:** in the ShinePhone app, or on the sticker on the inverter.
+   - **Inverter serial number:** see below.
 3. Press **Check and save**.
 
 Kelpwatt logs in to Growatt and reads your inverter before it saves anything, so you know straight away if a detail is wrong. If Growatt is slow to answer, wait a minute and try again.
+
+### Finding your inverter serial number
+
+Your Growatt system has two serial numbers, and it's easy to pick the wrong one. Kelpwatt needs the **inverter's**, not the data logger's (the Wi-Fi or LAN dongle plugged into the inverter).
+
+- **In the ShinePhone app or on server.growatt.com:** open your plant's device list and choose the inverter, not the data logger. The number you want is labelled **Device Serial Number**. The data logger has its own serial number, which won't work.
+- **On the inverter itself:** it's on the sticker on the side of the inverter. The dongle has a separate sticker with its own number.
+
+If **Check and save** says it logged in but couldn't read your inverter, check you haven't copied the data logger's number, and that the inverter is online.
 
 ## 3. Add your Octopus API key (optional)
 
@@ -61,18 +70,41 @@ For extra protection, turn on two-step login under **Settings → Authenticator 
 
 ## 4. Add your battery details
 
-Growatt doesn't share your battery's size or power, so Kelpwatt asks for them. They're used to work out how long an export can run. In **Settings → Your battery**, add:
+Growatt doesn't share your battery's size or power, so Kelpwatt asks for them. They're used to work out how long an export can run. Add both in **Settings → Your battery**, then press **Save battery details**.
 
-- **Battery size (kWh):** the usable capacity from your battery's spec sheet. If you have more than one battery, add them up.
-- **Max discharge power (kW):** export at a 100% rate and read the battery discharge power in the Growatt app. If you can only test at 95%, divide what it shows by 0.95.
+You only need these for **Export to grid until battery %** and **Automatic export**. Everything else works without them.
+
+### Battery size (kWh)
+
+This is how much energy your battery holds when full.
+
+1. Find your battery's model name. It's on the label on the battery itself, and on the invoice or paperwork from your installer.
+2. Growatt's model names usually include the size. For example, an ALP 5.0L is 5 kWh, and an APX 10.0P is 10 kWh.
+3. Some Growatt batteries, such as the ARK and APX ranges, are made of stacked modules. Multiply one module's size by how many you have. ARK modules are 2.56 kWh each, so a stack of three is 7.68 kWh.
+4. If you have more than one battery, add them up.
+
+If the spec sheet gives both a total and a **usable** capacity, use the usable one.
+
+### Max discharge power (kW)
+
+This is how fast your battery empties when it exports at full rate. It's easiest to measure:
+
+1. Pick a time when the battery is well above your stop level.
+2. On Kelpwatt's dashboard, in **Export to grid**, press **Load**. Add a slot starting now, set **Discharge rate %** to 100, and press **Apply export times**.
+3. After a minute or two, open ShinePhone or server.growatt.com and read the battery's power on the live energy flow diagram.
+4. Back in Kelpwatt, press **Disable All**, then **Apply export times**, to stop the export.
+
+If you can only test at 95%, divide what it shows by 0.95. For example, 3.5 kW at 95% is 3.68 kW at 100%.
+
+These are estimates, and that's fine: Kelpwatt ends exports a little early to allow for it. If exports regularly stop well above or below the level you picked, adjust these numbers.
 
 ## 5. Choose your battery charging settings
 
 In **Settings → Battery charging settings**, pick:
 
-- **Charge power:** how much of the inverter's power to charge from the grid with.
-- **Stop at battery:** the level where grid charging stops.
-- **Charge in my own window** (optional): a fixed nightly window, for example 23:30–05:30.
+- **Charge power:** how much of the inverter's power to charge from the grid with. We recommend **60%** rather than the full 100%. Charging more gently is easier on your battery, and over a night it's usually still enough to fill it. If your battery doesn't reach your stop level by the end of the window, raise it a step at a time.
+- **Stop at battery:** the level where grid charging stops. We recommend **90%**. It's easier on the battery than charging to 100%, and it leaves a little room for your solar panels the next morning.
+- **Charge in my own window** (optional): a window your battery charges in every night. Set it to your tariff's cheap night period, for example 23:30–05:30 on Intelligent Octopus Go, so the battery fills up at the cheapest rate and powers your home through the day.
 
 These fill in the dashboard's **Apply my settings** button. With Octopus, automatic charging uses them too.
 
