@@ -23,7 +23,7 @@ const SELECT = `${selectClass} disabled:opacity-50 disabled:cursor-not-allowed`;
 
 // The fixed overnight charge window (optional), and how the inverter charges
 // from the grid. Starts from what's saved; edits stay here until Save.
-const ChargeSettingsForm = ({ saved }: ChargeSettingsFormProps) => {
+const ChargeSettingsForm = ({ saved, hasOctopus }: ChargeSettingsFormProps) => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const [windowEnabled, setWindowEnabled] = useState(saved.windowEnabled);
@@ -130,9 +130,13 @@ const ChargeSettingsForm = ({ saved }: ChargeSettingsFormProps) => {
             Charge in my own window
           </label>
           <span id="window-enabled-hint" className="text-xs text-gray-500">
-            {windowEnabled
-              ? "Charges every night between these times, plus your Octopus slots. Octopus slots inside the window are left out, and ones partly inside are cut to the part outside."
-              : "Only your Octopus slots are used, up to 6 of them. With none planned, the inverter doesn't charge from the grid."}
+            {hasOctopus
+              ? windowEnabled
+                ? "Charges every night between these times, plus your Octopus slots. Octopus slots inside the window are left out, and ones partly inside are cut to the part outside."
+                : "Only your Octopus slots are used, up to 6 of them. With none planned, the inverter doesn't charge from the grid."
+              : windowEnabled
+                ? "Apply my settings on the dashboard fills in these times."
+                : "Apply my settings on the dashboard keeps the times on your inverter and only sets the power and stop level."}
           </span>
         </div>
       </div>
@@ -190,7 +194,8 @@ const ChargeSettingsForm = ({ saved }: ChargeSettingsFormProps) => {
       </div>
       <p className="-mt-2 text-xs text-gray-500">
         How much of the inverter&apos;s power to charge from the grid with, and
-        the battery level to stop at. Used for the Octopus slots too.
+        the battery level to stop at.
+        {hasOctopus && " Used for the Octopus slots too."}
       </p>
       {isChanged && (
         <SubmitButton

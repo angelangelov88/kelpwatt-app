@@ -39,7 +39,8 @@ type CredentialsRowProps = {
 };
 
 // The saved settings the form starts from.
-type ChargeSettingsFormProps = { saved: Settings };
+// hasOctopus: the texts mention Octopus slots only when they're used.
+type ChargeSettingsFormProps = { saved: Settings; hasOctopus: boolean };
 
 type AutomationSwitchProps = { saved: Settings; canTurnOn: boolean };
 
@@ -69,7 +70,8 @@ type ExportPresetFieldsProps = {
 
 type DailyExportSwitchProps = { saved: Settings };
 
-type AutomaticExportSwitchProps = { saved: Settings };
+// hasOctopus: the car check runs, so the hint says so.
+type AutomaticExportSwitchProps = { saved: Settings; hasOctopus: boolean };
 
 type AutomaticExportFormProps = { saved: Settings };
 

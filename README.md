@@ -27,7 +27,7 @@ The logo shows energy flowing into a battery (the violet arrow) and back out to 
   - battery charging settings: an optional charge window (by default 23:30–05:30), power rate and stop SOC
   - Export to grid settings: an Export every day switch. Growatt clears the export times every night at 23:30; with it on, the 5-minute check puts back the ones last applied on the dashboard a few minutes later
   - the Export to grid presets: each one's name, times, discharge power and stop SOC
-  - Automatic export: Export until battery % every evening at a chosen time, with its discharge rate, stop level and the minimum battery level to run at. Skipped while the car is plugged in (Intelligent Octopus has charging planned), or if the export would last under 5 minutes; every run and skip shows in Activity
+  - Automatic export: Export until battery % every evening at a chosen time, with its discharge rate, stop level and the minimum battery level to run at. Needs Growatt and the battery details. With Octopus, skipped while the car is plugged in (Intelligent Octopus has charging planned); without it there's no car check. Also skipped if the battery is below that minimum, or if the export would last under 5 minutes; every run and skip shows in Activity
   - your battery: its size and max discharge power, for Export until battery % (Growatt doesn't give them)
   - password and MFA
   - data export and account deletion

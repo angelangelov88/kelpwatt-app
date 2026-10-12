@@ -215,15 +215,13 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
     const { enabled, at, powerRate, stopSOC, minSOC } = automatic.data;
     const saved = await withUser(userId, async (tx) => {
       if (enabled) {
-        const credentials = await tx<{ provider: string }[]>`
-          select provider from private.user_credentials`;
+        // Octopus is optional: without it, there's no car check.
+        const growatt = await tx`
+          select from private.user_credentials where provider = 'growatt'`;
         const battery = await tx`
           select from private.user_settings
           where battery_kwh is not null and battery_max_kw is not null`;
-        const has = (provider: string) =>
-          credentials.some((c) => c.provider === provider);
-        if (!has("growatt") || !has("octopus") || battery.length === 0)
-          return null;
+        if (growatt.length === 0 || battery.length === 0) return null;
       }
       await tx`
         insert into private.user_settings
@@ -258,7 +256,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         res,
         409,
         "setup_missing",
-        "Save your Growatt and Octopus details and your battery details before turning on Automatic export",
+        "Save your Growatt details and your battery details before turning on Automatic export",
       );
       return;
     }

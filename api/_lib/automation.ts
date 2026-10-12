@@ -536,13 +536,16 @@ const runAutomaticExport = async (
       loadOctopus(userId),
       loadGrowatt(userId, deadline),
     ]);
-    if (!octopus || !growatt || batteryKwh === null || maxDischargeKw === null)
+    if (!growatt || batteryKwh === null || maxDischargeKw === null)
       throw new AutomationError(
         "not_set_up",
-        "Your Growatt, Octopus or battery details are missing",
+        "Your Growatt or battery details are missing",
       );
-    const dispatches = await fetchDispatches(octopus.apiKey, octopus.account);
-    if (isCarPluggedIn(dispatches)) return await skip("car_plugged_in");
+    // Without Octopus there's no way to tell, so it exports anyway.
+    if (octopus) {
+      const dispatches = await fetchDispatches(octopus.apiKey, octopus.account);
+      if (isCarPluggedIn(dispatches)) return await skip("car_plugged_in");
+    }
     const { client, serial } = growatt;
     await logIn(client);
     const soc = await onInverter(() => client.fetchBatterySoc(serial));

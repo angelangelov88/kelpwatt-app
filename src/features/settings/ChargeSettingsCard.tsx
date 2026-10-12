@@ -5,18 +5,19 @@ import useAuth from "../auth/useAuth";
 import ChargeSettingsForm from "./ChargeSettingsForm";
 import useSettings from "./useSettings";
 
-// How the inverter charges from the grid. Used by automatic charging and by
-// the green button on the dashboard's Octopus card, so only with Octopus.
+// How the inverter charges from the grid. Used by the Charge battery card's
+// Apply my settings (Growatt), and by automatic charging and the green button
+// on the dashboard's Octopus card (Octopus), so with either.
 const ChargeSettingsCard = () => {
   const { me } = useAuth();
   const settings = useSettings();
+  const hasOctopus = me?.hasOctopus ?? false;
 
   const renderBody = () => {
-    if (!(me?.hasOctopus ?? false))
+    if (!(me?.hasGrowatt ?? false) && !hasOctopus)
       return (
         <p className="text-sm text-gray-400">
-          These are used with your Octopus slots. Add your Octopus details below
-          to use them.
+          Add your Growatt or Octopus details below to use these.
         </p>
       );
     if (settings.isPending)
@@ -26,7 +27,7 @@ const ChargeSettingsCard = () => {
         </p>
       );
     if (settings.isError) return <FormAlert message={settings.error.message} />;
-    return <ChargeSettingsForm saved={settings.data} />;
+    return <ChargeSettingsForm saved={settings.data} hasOctopus={hasOctopus} />;
   };
 
   return (
@@ -43,9 +44,11 @@ const ChargeSettingsCard = () => {
         </h2>
         <InfoTip label="Battery charging settings">
           <p>
-            How the inverter charges your battery from the grid. Used by
-            automatic charging and by the green button on the dashboard&apos;s
-            Octopus card.
+            How the inverter charges your battery from the grid. Used by{" "}
+            <b>Apply my settings</b> on the dashboard&apos;s Charge battery card
+            {hasOctopus &&
+              ", automatic charging and the green button on the Octopus card"}
+            .
           </p>
         </InfoTip>
       </div>
