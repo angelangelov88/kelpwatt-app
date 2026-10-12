@@ -7,17 +7,19 @@ import AutomaticExportSwitch from "./AutomaticExportSwitch";
 import useSettings from "./useSettings";
 
 // Automatic export: Export until battery % every evening at a chosen time.
-// Needs Growatt (the battery level and the export), Octopus (whether the car
-// is plugged in) and the battery details (how long to export for).
+// Needs Growatt (the battery level and the export) and the battery details
+// (how long to export for). With Octopus, it also skips while the car is
+// plugged in.
 const AutomaticExportCard = () => {
   const { me } = useAuth();
   const settings = useSettings();
+  const hasOctopus = me?.hasOctopus ?? false;
 
   const renderBody = () => {
-    if (!(me?.hasGrowatt ?? false) || !(me?.hasOctopus ?? false))
+    if (!(me?.hasGrowatt ?? false))
       return (
         <p className="text-sm text-gray-400">
-          Add your Growatt and Octopus details below to use this.
+          Add your Growatt details below to use this.
         </p>
       );
     if (settings.isPending)
@@ -38,7 +40,7 @@ const AutomaticExportCard = () => {
       );
     return (
       <div className="flex flex-col gap-6">
-        <AutomaticExportSwitch saved={settings.data} />
+        <AutomaticExportSwitch saved={settings.data} hasOctopus={hasOctopus} />
         <AutomaticExportForm saved={settings.data} />
       </div>
     );
@@ -63,8 +65,9 @@ const AutomaticExportCard = () => {
             the grid until it reaches your stop level.
           </p>
           <p>
-            It doesn&apos;t run while your car is plugged in, when the battery
-            is below your minimum, or when the export would last less than 5
+            It doesn&apos;t run
+            {hasOctopus && " while your car is plugged in,"} when the battery is
+            below your minimum, or when the export would last less than 5
             minutes. Every run and skip shows in Activity.
           </p>
         </InfoTip>

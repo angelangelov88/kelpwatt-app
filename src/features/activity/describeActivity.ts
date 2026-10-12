@@ -65,6 +65,9 @@ const CHECK_FAILURES: Record<string, string> = {
   growatt_serial_failed: "The inverter serial number didn't match the account",
   octopus_key_failed: "Octopus didn't recognise the API key",
   octopus_account_failed: "The account number didn't match the API key",
+  growatt_in_use: "That inverter is already linked to another Kelpwatt account",
+  octopus_in_use:
+    "That Octopus account is already linked to another Kelpwatt account",
 };
 
 // Growatt or Octopus didn't answer: at which call, and how.
@@ -257,8 +260,9 @@ const describeActivity = ({
       return { title: `${providerName(details)} removed`, failed: false };
     case "credentials_check_failed":
       return {
-        title:
-          text(details, "provider") === "octopus"
+        title: text(details, "reason")?.endsWith("_in_use")
+          ? `Couldn't save your ${providerName(details)}`
+          : text(details, "provider") === "octopus"
             ? "Octopus didn't accept the details you entered"
             : "Growatt didn't accept the details you entered",
         detail: CHECK_FAILURES[text(details, "reason") ?? ""],

@@ -8,7 +8,10 @@ import { SETTINGS_KEY } from "./useSettings";
 
 // Turns Automatic export on or off straight away, keeping the saved time and
 // levels.
-const AutomaticExportSwitch = ({ saved }: AutomaticExportSwitchProps) => {
+const AutomaticExportSwitch = ({
+  saved,
+  hasOctopus,
+}: AutomaticExportSwitchProps) => {
   const queryClient = useQueryClient();
   const { showToast } = useToast();
   const isOn = saved.automaticExport.enabled;
@@ -37,17 +40,19 @@ const AutomaticExportSwitch = ({ saved }: AutomaticExportSwitchProps) => {
           <span id="automatic-export-label" className="text-sm text-gray-200">
             Export every evening
           </span>
-          <span id="automatic-export-hint" className="text-sm text-gray-400">
-            It won&apos;t run while your car is plugged in. We see it as plugged
-            in when Intelligent Octopus has charging planned.
-          </span>
+          {hasOctopus && (
+            <span id="automatic-export-hint" className="text-sm text-gray-400">
+              It won&apos;t run while your car is plugged in. We see it as
+              plugged in when Intelligent Octopus has charging planned.
+            </span>
+          )}
         </div>
         <button
           type="button"
           role="switch"
           aria-checked={isOn}
           aria-labelledby="automatic-export-label"
-          aria-describedby="automatic-export-hint"
+          aria-describedby={hasOctopus ? "automatic-export-hint" : undefined}
           disabled={toggle.isPending}
           onClick={() => {
             toggle.mutate(!isOn);
