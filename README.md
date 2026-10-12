@@ -162,20 +162,21 @@ This is how production is set up, and what you'd repeat for a fresh copy.
    - **Redirect URLs:** none needed. Google comes back to our own API, not to Supabase.
 6. **Run the migrations:** open the SQL Editor and run each file in `supabase/migrations/` **in order**:
 
-   | Migration               | What it does                                                        |
-   | ----------------------- | ------------------------------------------------------------------- |
-   | `0001_init`             | Tables, RLS, the `app_server` role                                  |
-   | `0002_charge_limits`    | Power rate and stop SOC settings                                    |
-   | `0003_rate_limits`      | Rate limiting                                                       |
-   | `0004_has_password`     | Tells Google-only accounts apart from password accounts             |
-   | `0005_ci_check`         | The `ci_check` role                                                 |
-   | `0006_audit_retention`  | Deletes audit log entries older than 12 months                      |
-   | `0007_automation`       | The 5-minute schedule, automation state, window toggle              |
-   | `0008_user_limit`       | Limits the beta to 20 accounts                                      |
-   | `0009_export_presets`   | Each user's Grid First presets                                      |
-   | `0010_keep_export`      | Export every day: export times put back after Growatt's 23:30 reset |
-   | `0011_export_until`     | Battery details, and Export until battery % slots to turn off       |
-   | `0013_automatic_export` | Automatic export: Export until battery % every evening              |
+   | Migration                 | What it does                                                        |
+   | ------------------------- | ------------------------------------------------------------------- |
+   | `0001_init`               | Tables, RLS, the `app_server` role                                  |
+   | `0002_charge_limits`      | Power rate and stop SOC settings                                    |
+   | `0003_rate_limits`        | Rate limiting                                                       |
+   | `0004_has_password`       | Tells Google-only accounts apart from password accounts             |
+   | `0005_ci_check`           | The `ci_check` role                                                 |
+   | `0006_audit_retention`    | Deletes audit log entries older than 12 months                      |
+   | `0007_automation`         | The 5-minute schedule, automation state, window toggle              |
+   | `0008_user_limit`         | Limits the beta to 20 accounts                                      |
+   | `0009_export_presets`     | Each user's Grid First presets                                      |
+   | `0010_keep_export`        | Export every day: export times put back after Growatt's 23:30 reset |
+   | `0011_export_until`       | Battery details, and Export until battery % slots to turn off       |
+   | `0013_automatic_export`   | Automatic export: Export until battery % every evening              |
+   | `0014_unique_credentials` | One account per inverter and per Octopus account                    |
 
    There's no migration tool. Each migration is applied by hand, once. Before `0007`, store `CRON_SECRET` in Vault (see [Automatic charging](#automatic-charging)).
 

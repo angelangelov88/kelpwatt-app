@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import postgres from "postgres";
 import {
   credentialsSchema,
   providerSchema,
@@ -26,6 +27,19 @@ import { readStatus, recheckInverter } from "./_lib/userData";
 // Failed checks allowed per user per hour, so this endpoint can't be used to
 // guess other people's Growatt or Octopus logins.
 const MAX_FAILED_CHECKS_PER_HOUR = 5;
+
+// 0014: one Kelpwatt account per inverter and per Octopus account.
+const IN_USE_INDEX = "user_credentials_identifier_key";
+
+const IN_USE_MESSAGES = {
+  growatt: "This inverter is already linked to another Kelpwatt account",
+  octopus: "This Octopus account is already linked to another Kelpwatt account",
+};
+
+const isInUse = (err: unknown) =>
+  err instanceof postgres.PostgresError &&
+  err.code === "23505" &&
+  err.constraint_name === IN_USE_INDEX;
 
 const md5 = (text: string) => createHash("md5").update(text).digest("hex");
 
@@ -264,7 +278,31 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       identifier,
     });
     return readStatus(tx);
+  }).catch((err: unknown) => {
+    if (isInUse(err)) return null;
+    throw err;
   });
+  // Already saved by another account. Checked after Growatt or Octopus
+  // accepted them, so only someone who can see that inverter or account
+  // learns it's in use. Counts as a failed check.
+  if (!status) {
+    const { provider } = body.data;
+    const code = `${provider}_in_use`;
+    console.error(
+      "credentials check failed:",
+      code,
+      `user ${userId.slice(0, 8)}`,
+    );
+    await withUser(userId, (tx) =>
+      audit(tx, req, userId, "credentials_check_failed", {
+        provider,
+        reason: code,
+        step: provider === "growatt" ? "inverter" : "account",
+      }),
+    );
+    sendError(res, 409, code, IN_USE_MESSAGES[provider]);
+    return;
+  }
   res.json(status);
 };
 
