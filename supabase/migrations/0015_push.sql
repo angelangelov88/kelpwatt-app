@@ -129,7 +129,7 @@ begin
   if v_to is null then
     return;
   end if;
-  update private.push_state set last_audit_id = v_to;
+  update private.push_state set last_audit_id = v_to where id;
   return query
     select a.id, a.user_id, a.action, a.details, a.ip is null
     from private.audit_log a
@@ -165,7 +165,8 @@ begin
           where created_at < now() - interval '15 seconds'),
         0
       )
-    );
+    )
+    where id;
     return false;
   end if;
   select decrypted_secret into v_secret
