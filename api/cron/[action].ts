@@ -1,3 +1,4 @@
+import { cronNotifyHandler } from "../_handlers/cron/notify";
 import { cronUpdateHandler } from "../_handlers/cron/update";
 import { cronUserHandler } from "../_handlers/cron/user";
 import { createRouter } from "../_lib/router";
@@ -8,6 +9,7 @@ export const config = { maxDuration: 60 };
 
 // /api/cron/<action>, only for the schedule. The code is in api/_handlers/cron/.
 export default createRouter({
+  notify: cronNotifyHandler,
   user: cronUserHandler,
   update: cronUpdateHandler,
 });

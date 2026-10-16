@@ -15,10 +15,15 @@ import type { contactSchema } from "../lib/contactSchema";
 import type { periodsSchema } from "../lib/growattSchemas";
 import type { joinSchema } from "../lib/octopusSchemas";
 import type {
+  pushEndpointSchema,
+  pushSubscriptionSchema,
+} from "../lib/pushSchema";
+import type {
   batterySchema,
   dailyExportSchema,
   automaticExportSchema,
   exportPresetsSchema,
+  notificationsSchema,
   settingsSchema,
   themeSchema,
 } from "../lib/settingsSchema";
@@ -110,6 +115,10 @@ type BatteryInfo = z.infer<typeof batterySchema>;
 type ThemeSetting = z.infer<typeof themeSchema>;
 type Theme = ThemeSetting["theme"];
 
+// Which kinds of push notification the user wants.
+type NotificationPrefs = z.infer<typeof notificationsSchema>;
+type NotificationCategory = keyof NotificationPrefs;
+
 // GET /api/settings, and what the PUTs return. exportEveryDay: the export
 // times last applied on the dashboard are put back every night after
 // Growatt's 23:30 reset. batteryKwh, maxDischargeKw: null until saved.
@@ -118,6 +127,7 @@ type Settings = ChargeSettings & {
   exportEveryDay: boolean;
   automaticExport: AutomaticExport;
   theme: Theme;
+  notifications: NotificationPrefs;
 } & { [K in keyof BatteryInfo]: BatteryInfo[K] | null };
 
 // GET /api/automation: what automatic charging last did. Times are ISO
@@ -170,7 +180,20 @@ type AccountExport = {
     details: unknown;
     ip: string | null;
   }[];
+  // Devices with notifications on. service: the push service's host.
+  pushDevices: {
+    createdAt: string;
+    lastSentAt: string | null;
+    service: string;
+  }[];
 };
+
+// GET /api/push: the key devices subscribe with (public, not a secret).
+type PushConfig = { publicKey: string };
+// POST /api/push.
+type PushSubscriptionBody = z.infer<typeof pushSubscriptionSchema>;
+// DELETE /api/push.
+type PushEndpointBody = z.infer<typeof pushEndpointSchema>;
 
 // GET /api/account?view=activity&before=<id>: the activity log, newest first,
 // a page at a time. nextBefore: pass it as before for the next page, or null
@@ -221,6 +244,8 @@ export type {
   BatteryInfo,
   ThemeSetting,
   Theme,
+  NotificationPrefs,
+  NotificationCategory,
   Settings,
   AutomationStatus,
   CheckNowResult,
@@ -231,6 +256,9 @@ export type {
   SavingSessions,
   JoinBody,
   AccountExport,
+  PushConfig,
+  PushSubscriptionBody,
+  PushEndpointBody,
   ActivityEntry,
   ActivityPage,
   SignInMethod,

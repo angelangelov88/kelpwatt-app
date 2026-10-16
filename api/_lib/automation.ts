@@ -10,6 +10,7 @@ import {
   describePlan,
   diffPlan,
   planMatches,
+  toUkMinutes,
 } from "../../src/lib/chargePlan";
 import { resetDay, ukDay } from "../../src/lib/dailyExport";
 import { planExportUntil } from "../../src/lib/exportUntil";
@@ -51,6 +52,13 @@ const RECHECK_MS = 3 * 60 * 60 * 1000;
 // to save the failure.
 const CHECK_BUDGET_MS = 50_000;
 
+// The morning charging summary is written by the first scheduled check from
+// 07:00 UK time, if one gets to it by noon, and only with this long left of
+// the check: reading the battery needs a Growatt login.
+const SUMMARY_FROM_MIN = 7 * 60;
+const SUMMARY_UNTIL_MIN = 12 * 60;
+const SUMMARY_NEEDS_MS = 15_000;
+
 // A failure whose code and message are safe to show the user (they're on the
 // dashboard and in their data export). pause: a saved login was refused, and
 // retrying it every 5 minutes could get the account locked.
@@ -80,7 +88,8 @@ const takeLease = async (userId: string) => {
         export_failed_on::text as export_failed_on, one_off_until,
         one_off_slot, one_off_failed,
         automatic_export_on::text as automatic_export_on,
-        automatic_export_code, automatic_export_message`,
+        automatic_export_code, automatic_export_message,
+        summary_on::text as summary_on`,
   );
   return rows.at(0) ?? null;
 };
@@ -632,6 +641,65 @@ const giveUpAutomaticExport = (
     });
   });
 
+// "01:00-02:30" → minutes from 18:00, so the night's slots sort in order.
+const fromEvening = (slot: string) =>
+  (Number(slot.slice(0, 2)) * 60 + Number(slot.slice(3, 5)) + 6 * 60) % 1440;
+
+// Last night's charging, for the activity log and the morning notification:
+// the battery level now (null if it couldn't be read), the user's window, the
+// Octopus slots automatic charging set since 18:00 yesterday, and how many of
+// its checks failed. Written once a day; never throws.
+const writeChargingSummary = async (
+  userId: string,
+  settings: Settings,
+  deadline: number,
+) => {
+  let soc: number | null = null;
+  try {
+    const growatt = await loadGrowatt(userId, deadline);
+    if (growatt) {
+      await logIn(growatt.client);
+      soc = await onInverter(() =>
+        growatt.client.fetchBatterySoc(growatt.serial),
+      );
+    }
+  } catch {
+    // Said in the summary instead.
+  }
+  const window = settings.windowEnabled
+    ? `${settings.chargeStart}-${settings.chargeEnd}`
+    : null;
+  await withUser(userId, async (tx) => {
+    const rows = await tx<{ details: unknown }[]>`
+      select details from private.audit_log
+      where action = 'automation_run'
+        and created_at >= (((now() at time zone 'Europe/London')::date - 1)
+          + time '18:00') at time zone 'Europe/London'
+      order by id`;
+    let failures = 0;
+    const slots = new Set<string>();
+    for (const { details } of rows) {
+      const { result, added } = (details ?? {}) as Record<string, unknown>;
+      if (result === "failed") failures++;
+      if (result === "applied" && typeof added === "string")
+        for (const slot of added.split(",").map((s) => s.trim()))
+          if (/^\d\d:\d\d-\d\d:\d\d$/.test(slot) && slot !== window)
+            slots.add(slot);
+    }
+    await tx`
+      update private.automation_state
+      set summary_on = ${ukDay(new Date())}::date`;
+    await audit(tx, null, userId, "charging_summary", {
+      soc,
+      window,
+      slots:
+        [...slots].sort((a, b) => fromEvening(a) - fromEvening(b)).join(", ") ||
+        null,
+      failures,
+    });
+  });
+};
+
 // Runs whichever of automatic charging, Export every day and Automatic export
 // the user has on, and turns off an ended Export until battery % slot, holding
 // the lease so only one check talks to their inverter at a time.
@@ -716,6 +784,16 @@ const check = async (
       const result = await restoreExport(userId, state, req, deadline);
       if (!automationEnabled) outcome = { result, plan: null };
     }
+    const ukMinutes = toUkMinutes(new Date());
+    if (
+      scheduled &&
+      automationEnabled &&
+      state.summary_on !== ukDay(new Date()) &&
+      ukMinutes >= SUMMARY_FROM_MIN &&
+      ukMinutes < SUMMARY_UNTIL_MIN &&
+      deadline - Date.now() > SUMMARY_NEEDS_MS
+    )
+      await writeChargingSummary(userId, settings, deadline);
     return outcome;
   } finally {
     await withUser(

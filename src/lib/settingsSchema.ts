@@ -111,6 +111,16 @@ const batterySchema = z.object({
 // PUT /api/settings?part=theme: light, dark or the device's setting.
 const themeSchema = z.object({ theme: z.enum(["system", "light", "dark"]) });
 
+// PUT /api/settings?part=notifications: which kinds of push notification to
+// send, to every device the user has turned them on for.
+const notificationsSchema = z.object({
+  failures: z.boolean(),
+  automaticExport: z.boolean(),
+  exports: z.boolean(),
+  security: z.boolean(),
+  summary: z.boolean(),
+});
+
 // Until the user saves their own.
 const defaultSettings: z.infer<typeof settingsSchema> = {
   windowEnabled: true,
@@ -155,6 +165,7 @@ export {
   automaticExportSchema,
   batterySchema,
   themeSchema,
+  notificationsSchema,
   defaultSettings,
   defaultExportPresets,
   defaultAutomaticExport,
