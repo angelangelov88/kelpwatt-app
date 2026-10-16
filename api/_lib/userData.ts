@@ -33,6 +33,11 @@ type SettingsRow = {
   automatic_export_power: number | null;
   automatic_export_stop: number | null;
   automatic_export_min_soc: number | null;
+  notify_failures: boolean;
+  notify_automatic_export: boolean;
+  notify_exports: boolean;
+  notify_security: boolean;
+  notify_summary: boolean;
 } & Record<`${Preset}_export_${"name" | "start" | "end"}`, string | null> &
   Record<`${Preset}_export_${"power" | "stop"}`, number | null>;
 
@@ -61,7 +66,8 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
       battery_max_kw::float8 as battery_max_kw,
       automatic_export, automatic_export_at::text as automatic_export_at,
       automatic_export_power, automatic_export_stop, automatic_export_min_soc,
-      theme
+      theme, notify_failures, notify_automatic_export, notify_exports,
+      notify_security, notify_summary
     from private.user_settings`;
   const row = rows.at(0);
   const preset = (key: Preset): ExportPreset => {
@@ -95,6 +101,14 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
     batteryKwh: row?.battery_kwh ?? null,
     maxDischargeKw: row?.battery_max_kw ?? null,
     theme: row?.theme ?? "system",
+    // Every kind is on until the user turns it off.
+    notifications: {
+      failures: row?.notify_failures ?? true,
+      automaticExport: row?.notify_automatic_export ?? true,
+      exports: row?.notify_exports ?? true,
+      security: row?.notify_security ?? true,
+      summary: row?.notify_summary ?? true,
+    },
   };
 };
 

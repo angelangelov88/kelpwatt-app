@@ -61,7 +61,8 @@ type AuditAction =
   | "battery_saved"
   | "one_off_ended"
   | "automatic_export_saved"
-  | "automatic_export_run";
+  | "automatic_export_run"
+  | "charging_summary";
 
 // Which call of a credentials check went wrong: Growatt's login or the
 // inverter read with the serial, Octopus's API key or the account number.
@@ -140,10 +141,40 @@ type AutomationStateRow = {
   automatic_export_on: string | null;
   automatic_export_code: string | null;
   automatic_export_message: string | null;
+  // The UK date (YYYY-MM-DD) the morning charging summary was last written.
+  summary_on: string | null;
 };
 
 // The /api/cron/update reply. Counts only: GitHub Actions logs are public.
 type CronSummary = { users: number } & Record<AutomationResult, number>;
+
+// A new audit_log row to maybe send a push for (private.take_push_rows).
+// from_schedule: written by the scheduled check, not a request from the user.
+type PushRow = {
+  id: string;
+  user_id: string;
+  action: string;
+  details: unknown;
+  from_schedule: boolean;
+};
+
+// A private.push_subscriptions row: one device with notifications on.
+type PushSubscriptionRow = {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
+// The /api/cron/notify reply, counts only. rows: audit rows looked at; sent:
+// pushes delivered; removed: devices the push service said are gone; failed:
+// pushes that didn't go.
+type CronNotifySummary = {
+  rows: number;
+  sent: number;
+  removed: number;
+  failed: number;
+};
 
 export type {
   Tx,
@@ -162,4 +193,7 @@ export type {
   AutomationTrigger,
   AutomationStateRow,
   CronSummary,
+  PushRow,
+  PushSubscriptionRow,
+  CronNotifySummary,
 };

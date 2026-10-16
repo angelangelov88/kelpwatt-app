@@ -6,6 +6,7 @@ import {
   batterySchema,
   dailyExportSchema,
   exportPresetsSchema,
+  notificationsSchema,
   settingsSchema,
   themeSchema,
 } from "../src/lib/settingsSchema";
@@ -44,6 +45,9 @@ const presetDetails = ({ high, low }: ExportPresets) =>
 // PUT ?part=theme ThemeSetting → Settings. Light, dark or the device's
 //   setting. Leaves everything else alone. Not audited: it's only how the
 //   app looks.
+// PUT ?part=notifications NotificationPrefs → Settings. Which kinds of push
+//   notification to send, on every device the user turned them on for.
+//   Leaves everything else alone. Not audited, like the theme.
 const handler = async (req: VercelRequest, res: VercelResponse) => {
   if (!allowMethods(req, res, ["GET", "PUT"]) || !checkOrigin(req, res)) return;
   const user = await requireUser(req, res);
@@ -120,6 +124,38 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
           insert into private.user_settings (user_id, theme)
           values (${userId}, ${theme})
           on conflict (user_id) do update set theme = excluded.theme`;
+        return readSettings(tx);
+      }),
+    );
+    return;
+  }
+
+  if (req.query.part === "notifications") {
+    const body = notificationsSchema.safeParse(req.body);
+    if (!body.success) {
+      sendError(
+        res,
+        400,
+        "invalid_input",
+        body.error.issues[0]?.message ?? "Invalid input",
+      );
+      return;
+    }
+    const { failures, automaticExport, exports, security, summary } = body.data;
+    res.json(
+      await withUser(userId, async (tx) => {
+        await tx`
+          insert into private.user_settings
+            (user_id, notify_failures, notify_automatic_export,
+              notify_exports, notify_security, notify_summary)
+          values (${userId}, ${failures}, ${automaticExport}, ${exports},
+            ${security}, ${summary})
+          on conflict (user_id) do update set
+            notify_failures = excluded.notify_failures,
+            notify_automatic_export = excluded.notify_automatic_export,
+            notify_exports = excluded.notify_exports,
+            notify_security = excluded.notify_security,
+            notify_summary = excluded.notify_summary`;
         return readSettings(tx);
       }),
     );

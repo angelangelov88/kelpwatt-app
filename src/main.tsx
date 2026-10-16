@@ -12,6 +12,7 @@ import ThemeProvider from "./contexts/ThemeProvider";
 import ToastProvider from "./contexts/ToastProvider";
 import { ME_KEY } from "./features/auth/useAuth";
 import { ApiRequestError } from "./lib/apiClient";
+import { registerServiceWorker } from "./lib/pushDevice";
 
 // Any request can find the session gone (401) or, for a user with MFA, not yet
 // past the code (mfa_required). Either way, update who is logged in, and the
@@ -31,6 +32,9 @@ const queryClient = new QueryClient({
     mutations: { retry: false },
   },
 });
+
+// For push notifications (public/sw.js).
+registerServiceWorker();
 
 const rootElement = document.getElementById("root");
 

@@ -48,8 +48,17 @@ const PrivacyPage = () => (
           window and whether it&apos;s used, charge power, battery stop level
           and whether automatic charging is on, your Automatic export settings
           (whether it&apos;s on, its time, discharge rate, stop level and
-          minimum battery level), and the theme you chose (light, dark or your
-          device&apos;s setting).
+          minimum battery level), the theme you chose (light, dark or your
+          device&apos;s setting), and which kinds of notification you want.
+        </li>
+        <li>
+          <strong className="text-gray-100">Notifications:</strong> if you turn
+          notifications on for a phone or computer, the address your browser
+          gives us to send them to (at Google, Apple, Mozilla or
+          Microsoft&apos;s push service, depending on your browser), the keys
+          that encrypt them for that device, when you turned them on and when we
+          last sent one. Notifications are written from your activity log when
+          they&apos;re sent, and we don&apos;t keep them.
         </li>
         <li>
           <strong className="text-gray-100">Automatic charging status:</strong>{" "}
@@ -71,8 +80,9 @@ const PrivacyPage = () => (
           inverter, started failing or started working again, each
           evening&apos;s Automatic export (when it started or why it was
           skipped, with your battery level at the time), and downloads of your
-          data. It never contains passwords or keys. You can read it on the
-          Activity page.
+          data, and a summary of each night&apos;s automatic charging with your
+          battery level the next morning. It never contains passwords or keys.
+          You can read it on the Activity page.
         </li>
         <li>
           <strong className="text-gray-100">Messages you send us:</strong> if
@@ -170,6 +180,15 @@ const PrivacyPage = () => (
           API key to read your planned charging times and saving sessions, and
           to join a session when you ask.
         </li>
+        <li>
+          <strong className="text-gray-100">
+            Your browser&apos;s push service
+          </strong>{" "}
+          (Google, Apple, Mozilla or Microsoft): only if you turn notifications
+          on. It delivers them to your device. They&apos;re encrypted so only
+          your device can read them, and the service holds one for at most 12
+          hours while your device is offline.
+        </li>
       </ul>
       <p>
         Growatt, Octopus and Google each have their own privacy policies for the
@@ -191,6 +210,11 @@ const PrivacyPage = () => (
           The activity log: 12 months, then entries are deleted automatically.
         </li>
         <li>Rate-limit counters: one day.</li>
+        <li>
+          Notification addresses: until you turn notifications off on that
+          device, log out on it, delete your account, or the push service tells
+          us the address no longer works.
+        </li>
         <li>
           Contact form messages: in our inbox for as long as we need them to
           help you, and no longer than 12 months.

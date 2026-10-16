@@ -1,9 +1,10 @@
-import { GROWATT_RESET } from "../../lib/dailyExport";
-import type { ActivityDescription } from "../../types/Activity";
-import type { ActivityEntry } from "../../types/Api";
+import { GROWATT_RESET } from "./dailyExport";
+import type { ActivityDescription } from "../types/Activity";
+import type { ActivityEntry } from "../types/Api";
 
-// Turns activity log entries into words. details comes from the database as
-// JSON and has changed over time, so every field is read defensively.
+// Turns activity log entries into words, for the activity page and push
+// notifications. details comes from the database as JSON and has changed over
+// time, so every field is read defensively.
 
 const field = (details: unknown, key: string): unknown =>
   typeof details === "object" && details !== null && key in details
@@ -222,10 +223,42 @@ const describePreset = (details: unknown, key: "high" | "low") => {
     .join(" ");
 };
 
+// The morning charging summary: the battery level now, the user's window and
+// the Octopus slots added or finished overnight, and how many checks failed.
+const describeChargingSummary = (details: unknown): ActivityDescription => {
+  const soc = number(details, "soc");
+  const failures = number(details, "failures") ?? 0;
+  const window = text(details, "window");
+  const slots = text(details, "slots");
+  const battery =
+    soc !== undefined
+      ? `Battery at ${String(soc)}%`
+      : "Couldn't read your battery level";
+  if (failures > 0)
+    return {
+      title: "Automatic charging had a problem last night",
+      detail: join([
+        battery,
+        `${String(failures)} failed check${failures === 1 ? "" : "s"}`,
+      ]),
+      failed: true,
+    };
+  return {
+    title: "Last night's charging",
+    detail: join([
+      battery,
+      window && `your ${formatSlots(window)} window`,
+      slots && `Octopus slots ${formatSlots(slots)}`,
+      !window && !slots && "no charge times",
+    ]),
+    failed: false,
+  };
+};
+
 const describeActivity = ({
   action,
   details,
-}: ActivityEntry): ActivityDescription => {
+}: Pick<ActivityEntry, "action" | "details">): ActivityDescription => {
   switch (action) {
     case "signed_in":
       return {
@@ -413,6 +446,9 @@ const describeActivity = ({
       return describeAutomaticExport(details);
     case "automation_run":
       return describeAutomation(details);
+    // The first scheduled check after 07:00, with automatic charging on.
+    case "charging_summary":
+      return describeChargingSummary(details);
     default:
       return { title: action, failed: false };
   }

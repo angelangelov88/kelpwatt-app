@@ -31,6 +31,8 @@ const LIMITS = {
   export: { max: 10, windowSeconds: 60 * 60 },
   // The activity page, 50 entries a request as the user scrolls.
   activity: { max: 60, windowSeconds: 10 * 60 },
+  // Turning notifications on or off on a device.
+  push: { max: 20, windowSeconds: 60 * 60 },
   // Can check the current password, so guesses must stay few.
   accountDelete: { max: 5, windowSeconds: 60 * 60 },
 } satisfies Record<string, { max: number; windowSeconds: number }>;

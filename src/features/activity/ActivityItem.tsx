@@ -1,6 +1,6 @@
 import type { ActivityItemProps } from "../../types/Activity";
 import { timeOf } from "./activityDays";
-import describeActivity from "./describeActivity";
+import describeActivity from "../../lib/describeActivity";
 
 // One activity log entry: when, what, and where it came from.
 const ActivityItem = ({ entry }: ActivityItemProps) => {

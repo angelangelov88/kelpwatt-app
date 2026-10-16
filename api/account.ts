@@ -92,7 +92,7 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
       sendError(res, 401, "unauthenticated", "Please log in");
       return;
     }
-    const { settings, automation, credentials, rows } = await withUser(
+    const { settings, automation, credentials, rows, devices } = await withUser(
       userId,
       async (tx) => {
         await audit(tx, req, userId, "account_exported");
@@ -103,6 +103,13 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
           rows: await tx<AuditRow[]>`
             select created_at, action, details, host(ip) as ip
             from private.audit_log order by id`,
+          // The push service's name, not the address: that's only useful for
+          // sending to the device.
+          devices: await tx<
+            { created_at: Date; last_sent_at: Date | null; endpoint: string }[]
+          >`
+            select created_at, last_sent_at, endpoint
+            from private.push_subscriptions order by id`,
         };
       },
     );
@@ -124,6 +131,11 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         action: r.action,
         details: r.details,
         ip: r.ip,
+      })),
+      pushDevices: devices.map((d) => ({
+        createdAt: d.created_at.toISOString(),
+        lastSentAt: d.last_sent_at?.toISOString() ?? null,
+        service: new URL(d.endpoint).hostname,
       })),
     };
     res.setHeader(

@@ -43,6 +43,7 @@ Browser (React)  ──cookies──▶  /api (Vercel functions, London)  ──
    no secrets                                                     ──▶  Growatt server
                                                                   ──▶  Octopus GraphQL API
 Supabase pg_cron (every 5 min) ──Bearer CRON_SECRET──▶ /api/cron/user, one request per user
+Supabase pg_cron (every minute, when there's news) ────▶ /api/cron/notify ──▶ browsers' push services
 ```
 
 - **The browser only talks to our `/api`.**
@@ -67,7 +68,7 @@ Supabase pg_cron (every 5 min) ──Bearer CRON_SECRET──▶ /api/cron/user,
 ## Project structure
 
 ```
-api/                    Vercel functions (9 of the Hobby plan's 12)
+api/                    Vercel functions (10 of the Hobby plan's 12)
   auth/[action].ts      login, signup, google, callback, confirm, logout, me, mfa, password
   growatt/[action].ts   charge / discharge (read and write the inverter)
   octopus/[action].ts   slots, sessions, join
@@ -75,7 +76,8 @@ api/                    Vercel functions (9 of the Hobby plan's 12)
   settings.ts           charge window, power rate, stop SOC, automation
   automation.ts         automatic charging status, Sync now
   account.ts            data export, activity log, account deletion
-  cron/[action].ts      user (one user's scheduled check), update (everyone, by hand)
+  push.ts               turns push notifications on or off for a device
+  cron/[action].ts      user (one user's scheduled check), update (everyone, by hand), notify (push notifications)
   contact.ts            the contact form (emails hello@angelov.uk through Resend)
   _handlers/            the handlers behind the [action] routes (not routed)
   _lib/                 session, CSRF, rate limits, crypto, database, audit log…
@@ -137,6 +139,9 @@ All of them are **server-only**: they're read in `api/` and never reach the brow
 | `CRON_SECRET`              | Lets the schedule call `/api/cron/*`: `openssl rand -hex 32`                                                                  | `.env`, Vercel Production, Supabase Vault (`cron_secret`), GitHub                                                 |
 | `RESEND_API_KEY`           | A Resend API key with sending access only, for the contact form                                                               | `.env`, Vercel                                                                                                    |
 | `CONTACT_FROM`             | The contact form's sender, on the Resend domain, e.g. `Kelpwatt <no-reply@mail.angelov.uk>`                                   | `.env`, Vercel                                                                                                    |
+| `VAPID_PUBLIC_KEY`         | Push notifications' public key, handed to browsers by `GET /api/push`: `pnpm dlx web-push generate-vapid-keys`                | `.env`, Vercel                                                                                                    |
+| `VAPID_PRIVATE_KEY`        | Signs push notifications (from the same command). Without the VAPID keys, the Notifications switch says they aren't set up.   | `.env`, Vercel                                                                                                    |
+| `VAPID_SUBJECT`            | A contact for the push services, e.g. `mailto:hello@angelov.uk`                                                               | `.env`, Vercel                                                                                                    |
 | `CI_DATABASE_URL`          | Postgres as `ci_check`, only for `pnpm check:database`                                                                        | `.env`, GitHub                                                                                                    |
 
 The local `.env` points at the **same Supabase project as production**. Test with throwaway accounts, and don't turn on automatic charging for a real inverter from a local run.
@@ -178,6 +183,7 @@ This is how production is set up, and what you'd repeat for a fresh copy.
    | `0011_export_until`       | Battery details, and Export until battery % slots to turn off       |
    | `0013_automatic_export`   | Automatic export: Export until battery % every evening              |
    | `0014_unique_credentials` | One account per inverter and per Octopus account                    |
+   | `0015_push`               | Push notifications: devices, kinds, the once-a-minute sender        |
 
    There's no migration tool. Each migration is applied by hand, once. Before `0007`, store `CRON_SECRET` in Vault (see [Automatic charging](#automatic-charging)).
 
@@ -307,6 +313,16 @@ Use the same value as `CRON_SECRET` in Vercel. Then run the migration. To see re
 
 To check everyone at once by hand: Actions → Update Growatt Charge Times → Run workflow (it calls `/api/cron/update`).
 
+The first scheduled check after 07:00 UK time also writes a `charging_summary` activity entry for users with automatic charging on: the battery level, their window, the Octopus slots set since 18:00 and how many checks failed.
+
+## Push notifications
+
+Users turn notifications on per device in Settings (`public/sw.js` shows them; `POST /api/push` saves the device). Nothing is sent where activity happens. Instead, `0015_push` adds a `push-notify` job that runs `private.schedule_push()` every minute. When there are new audit log rows for users with a device on, it calls `POST /api/cron/notify` (with the Vault `cron_secret`), which takes the rows, turns the ones the user wants into notifications (`src/lib/notifications.ts`, using the Activity page's words) and sends them. Otherwise it just moves past them. Rows older than an hour are skipped, and push services drop a notification after 12 hours if the device is off. A device the push service says is gone is deleted.
+
+Sent: background failures, Automatic export results, finished exports, security changes (even ones the user made), and the morning charging summary. Each kind can be turned off. "Automatic charging updated your inverter" isn't sent on its own: the morning summary covers it.
+
+To test by hand: `curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://kelpwatt.angelov.uk/api/cron/notify` replies with counts.
+
 ## Deploying
 
 1. Work on a branch and open a pull request into `main`. Vercel builds a preview for it.
@@ -347,6 +363,7 @@ If a secret leaks:
 | `SUPABASE_SECRET_KEY` or `SUPABASE_PUBLISHABLE_KEY` | Create a new key in Supabase (Project Settings → API Keys), update Vercel and GitHub, then delete the old key.                                   |
 | `DATABASE_URL` or `CI_DATABASE_URL`                 | Set a new password for the role (step 1.7 above) and update the connection strings.                                                              |
 | `CRON_SECRET`                                       | Generate a new one and update Vercel, Supabase Vault (`cron_secret`) and GitHub together.                                                        |
+| `VAPID_PRIVATE_KEY`                                 | Generate a new pair, update both keys in Vercel, and `delete from private.push_subscriptions`. Users turn notifications on again.                |
 | `GOOGLE_CLIENT_SECRET`                              | Add a new secret to the OAuth client in Google Cloud, update Supabase's Google provider and Vercel, then disable and delete the old one.         |
 | `RESEND_API_KEY`                                    | Create a new key in Resend (API Keys), update Vercel, then delete the old one.                                                                   |
 | `CREDENTIALS_ENC_KEY_V1`                            | Add a `…_V2` key and re-encrypt the saved details with it (the stored rows record their key version), or ask users to enter their details again. |
