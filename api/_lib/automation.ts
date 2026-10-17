@@ -10,8 +10,10 @@ import {
   describePlan,
   diffPlan,
   planMatches,
+  toUkClock,
   toUkMinutes,
 } from "../../src/lib/chargePlan";
+import { slotsThatRan } from "../../src/lib/chargingSummary";
 import { resetDay, ukDay } from "../../src/lib/dailyExport";
 import { planExportUntil } from "../../src/lib/exportUntil";
 import { GrowattDeadlineError } from "../../src/lib/growattApi";
@@ -59,6 +61,10 @@ const SUMMARY_FROM_MIN = 7 * 60;
 const SUMMARY_UNTIL_MIN = 12 * 60;
 const SUMMARY_NEEDS_MS = 15_000;
 
+// How long automatic charging must keep failing before a notification is
+// sent, unless the user has to do something about it.
+const FAILURE_NOTIFY_AFTER_MS = 30 * 60 * 1000;
+
 // A failure whose code and message are safe to show the user (they're on the
 // dashboard and in their data export). pause: a saved login was refused, and
 // retrying it every 5 minutes could get the account locked.
@@ -89,7 +95,7 @@ const takeLease = async (userId: string) => {
         one_off_slot, one_off_failed,
         automatic_export_on::text as automatic_export_on,
         automatic_export_code, automatic_export_message,
-        summary_on::text as summary_on`,
+        summary_on::text as summary_on, failing_since, failure_notified`,
   );
   return rows.at(0) ?? null;
 };
@@ -260,7 +266,7 @@ const checkCharge = async (
       await tx`
         update private.automation_state set
           checked_at = now(), last_code = null, last_message = null,
-          paused = false`;
+          paused = false, failing_since = null, failure_notified = false`;
       if (reached)
         await tx`
           update private.automation_state set
@@ -269,9 +275,9 @@ const checkCharge = async (
             plan_slots = ${describePlan(plan)},
             inverter_checked_at = case when ${verified} then now() end,
             applied_at = case when ${applied} then now() else applied_at end`;
-      // Changes to the inverter always go in the audit log; a quiet check
-      // only when it ends a run of failures. added/ended/removed say what
-      // changed, compared with what the inverter had.
+      // Changes to the inverter always go in the audit log, and a check that
+      // ends a run of failures says so. added/ended/removed say what changed,
+      // compared with what the inverter had.
       if (applied)
         await audit(tx, req, userId, "automation_run", {
           result: "applied",
@@ -282,10 +288,14 @@ const checkCharge = async (
           skipped: plan.skipped,
           ...diffPlan(replaced, describePlan(plan)),
         });
-      else if (state.last_code)
+      // notify: "stopped working" was sent, so "working again" is too. A
+      // change to the inverter says it's working already, so then this is
+      // only logged if it's needed for the notification.
+      if (state.last_code && (!applied || state.failure_notified))
         await audit(tx, req, userId, "automation_run", {
           result: "recovered",
           trigger,
+          notify: state.failure_notified,
         });
     });
     return {
@@ -306,21 +316,44 @@ const checkCharge = async (
           ? err.message
           : "unknown error",
     );
+    // Growatt or Octopus not answering usually sorts itself out by the next
+    // check, so the schedule only sends a notification straight away when
+    // the user has to do something (a refused login), and otherwise once
+    // it's lasted FAILURE_NOTIFY_AFTER_MS. notify: this entry is sent.
+    const isNew = state.last_code !== failure.code;
+    const notifyNow = isNew && failure.pause && trigger === "schedule";
+    const since = state.failing_since ?? new Date();
+    const lasting =
+      !state.failure_notified &&
+      !notifyNow &&
+      trigger === "schedule" &&
+      Date.now() - since.getTime() >= FAILURE_NOTIFY_AFTER_MS;
     await withUser(userId, async (tx) => {
       // The inverter may be half-written, so the next check reads it.
       await tx`
         update private.automation_state set
           checked_at = now(), last_code = ${failure.code},
           last_message = ${failure.message}, paused = ${failure.pause},
-          inverter_checked_at = null`;
+          inverter_checked_at = null,
+          failing_since = coalesce(failing_since, now()),
+          failure_notified = failure_notified or ${notifyNow || lasting}`;
       // Once per problem, not every 5 minutes while it lasts.
-      if (state.last_code !== failure.code)
+      if (isNew)
         await audit(tx, req, userId, "automation_run", {
           result: "failed",
           trigger,
           code: failure.code,
           message: failure.message,
           paused: failure.pause,
+          notify: notifyNow,
+        });
+      if (lasting)
+        await audit(tx, req, userId, "automation_run", {
+          result: "still_failing",
+          trigger,
+          code: failure.code,
+          message: failure.message,
+          since: toUkClock(since),
         });
     });
     return { outcome: { result: "failed", plan: null }, paused: failure.pause };
@@ -641,14 +674,12 @@ const giveUpAutomaticExport = (
     });
   });
 
-// "01:00-02:30" → minutes from 18:00, so the night's slots sort in order.
-const fromEvening = (slot: string) =>
-  (Number(slot.slice(0, 2)) * 60 + Number(slot.slice(3, 5)) + 6 * 60) % 1440;
-
 // Last night's charging, for the activity log and the morning notification:
 // the battery level now (null if it couldn't be read), the user's window, the
-// Octopus slots automatic charging set since 18:00 yesterday, and how many of
-// its checks failed. Written once a day; never throws.
+// other times the battery was set to charge since 18:00 yesterday
+// (slotsThatRan), how many of automatic charging's checks failed, and whether
+// it's still failing (problem: its message; paused: until the login is
+// updated). Written once a day; never throws.
 const writeChargingSummary = async (
   userId: string,
   settings: Settings,
@@ -670,32 +701,57 @@ const writeChargingSummary = async (
     ? `${settings.chargeStart}-${settings.chargeEnd}`
     : null;
   await withUser(userId, async (tx) => {
-    const rows = await tx<{ details: unknown }[]>`
-      select details from private.audit_log
-      where action = 'automation_run'
-        and created_at >= (((now() at time zone 'Europe/London')::date - 1)
-          + time '18:00') at time zone 'Europe/London'
-      order by id`;
-    let failures = 0;
-    const slots = new Set<string>();
-    for (const { details } of rows) {
-      const { result, added } = (details ?? {}) as Record<string, unknown>;
-      if (result === "failed") failures++;
-      if (result === "applied" && typeof added === "string")
-        for (const slot of added.split(",").map((s) => s.trim()))
-          if (/^\d\d:\d\d-\d\d:\d\d$/.test(slot) && slot !== window)
-            slots.add(slot);
-    }
+    // The night's checks, after the last change before it: that's what the
+    // inverter had at 18:00.
+    const rows = await tx<
+      {
+        result: string | null;
+        slots: string | null;
+        at: Date;
+        before_night: boolean;
+      }[]
+    >`
+      with night as (
+        select (((now() at time zone 'Europe/London')::date - 1)
+          + time '18:00') at time zone 'Europe/London' as start
+      )
+      (select details->>'result' as result, details->>'slots' as slots,
+          created_at as at, true as before_night
+        from private.audit_log, night
+        where action = 'automation_run' and details->>'result' = 'applied'
+          and created_at < night.start
+        order by created_at desc limit 1)
+      union all
+      (select details->>'result', details->>'slots', created_at, false
+        from private.audit_log, night
+        where action = 'automation_run' and created_at >= night.start)
+      order by at`;
+    const failures = rows.filter(
+      (r) => !r.before_night && r.result === "failed",
+    ).length;
+    const plans = rows.flatMap((r) =>
+      r.result === "applied" && r.slots !== null
+        ? [{ at: r.at, slots: r.slots, beforeNight: r.before_night }]
+        : [],
+    );
+    const [state] = await tx<
+      {
+        last_code: string | null;
+        last_message: string | null;
+        paused: boolean;
+      }[]
+    >`select last_code, last_message, paused from private.automation_state`;
+    const failing = state.last_code !== null;
     await tx`
       update private.automation_state
       set summary_on = ${ukDay(new Date())}::date`;
     await audit(tx, null, userId, "charging_summary", {
       soc,
       window,
-      slots:
-        [...slots].sort((a, b) => fromEvening(a) - fromEvening(b)).join(", ") ||
-        null,
+      slots: slotsThatRan(plans, window) || null,
       failures,
+      problem: failing ? (state.last_message ?? "Something went wrong") : null,
+      paused: failing && state.paused,
     });
   });
 };

@@ -12,7 +12,7 @@ const KINDS: NotificationKind[] = [
   {
     key: "failures",
     label: "Problems",
-    hint: "Automatic charging stopped or started working again, Automatic export didn't run, or export times couldn't be turned off or put back.",
+    hint: "Automatic charging needs your saved login updated or hasn't worked for 30 minutes (and when it works again), Automatic export didn't run, or export times couldn't be turned off or put back.",
   },
   {
     key: "summary",

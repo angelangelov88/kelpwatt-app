@@ -12,8 +12,8 @@ Now Kelpwatt can tell you. Turn on notifications and your phone or computer show
 
 You choose which kinds you want. All are ticked to start with.
 
-- **Problems:** automatic charging stopped working (for example because Growatt refused your saved login) or started working again, Automatic export didn't run, or Kelpwatt couldn't turn off or put back your export times. These are only sent for things Kelpwatt did on its own: if a button you just pressed fails, you'll already see it on screen.
-- **Morning charging summary:** one message after 07:00 saying how last night went, for example _"Battery at 90% · your 23:30–05:30 window, plus Octopus slots 01:00–02:30"_. If a check failed overnight, it says so. You only get this with **Automatic charging** on.
+- **Problems:** automatic charging needs you to update your saved Growatt login, or hasn't worked for 30 minutes, and then when it works again. Growatt or Octopus not answering one check usually sorts itself out by the next one, 5 minutes later, so that isn't worth waking you for. Also: Automatic export didn't run, or Kelpwatt couldn't turn off or put back your export times. These are only sent for things Kelpwatt did on its own: if a button you just pressed fails, you'll already see it on screen.
+- **Morning charging summary:** one message after 07:00 saying how last night went, for example _"Battery at 90% · your 23:30–05:30 window · plus Octopus slots 01:00–02:30"_. It also says if any checks failed overnight, but only calls it a problem if automatic charging still isn't working. You only get this with **Automatic charging** on.
 - **Automatic export:** whether tonight's export started, with its times and battery levels, or why it was skipped (your car was plugged in, the battery was too low, and so on).
 - **Exports finished:** when an **Export until battery %** ends, whether you started it yourself or Automatic export did.
 - **Security:** logins, password and two-step login changes, saved or removed Growatt and Octopus details, and data downloads. These are sent even when you did it yourself, so you'd notice straight away if it wasn't you.
