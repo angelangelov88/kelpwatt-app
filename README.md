@@ -184,6 +184,7 @@ This is how production is set up, and what you'd repeat for a fresh copy.
    | `0013_automatic_export`   | Automatic export: Export until battery % every evening              |
    | `0014_unique_credentials` | One account per inverter and per Octopus account                    |
    | `0015_push`               | Push notifications: devices, kinds, the once-a-minute sender        |
+   | `0016_failure_notify`     | Failure notifications only once a problem lasts or needs the user   |
 
    There's no migration tool. Each migration is applied by hand, once. Before `0007`, store `CRON_SECRET` in Vault (see [Automatic charging](#automatic-charging)).
 
@@ -319,7 +320,7 @@ The first scheduled check after 07:00 UK time also writes a `charging_summary` a
 
 Users turn notifications on per device in Settings (`public/sw.js` shows them; `POST /api/push` saves the device). Nothing is sent where activity happens. Instead, `0015_push` adds a `push-notify` job that runs `private.schedule_push()` every minute. When there are new audit log rows for users with a device on, it calls `POST /api/cron/notify` (with the Vault `cron_secret`), which takes the rows, turns the ones the user wants into notifications (`src/lib/notifications.ts`, using the Activity page's words) and sends them. Otherwise it just moves past them. Rows older than an hour are skipped, and push services drop a notification after 12 hours if the device is off. A device the push service says is gone is deleted.
 
-Sent: background failures, Automatic export results, finished exports, security changes (even ones the user made), and the morning charging summary. Each kind can be turned off. "Automatic charging updated your inverter" isn't sent on its own: the morning summary covers it.
+Sent: background failures (automatic charging's only when the user has to act, or after 30 minutes of failed checks, then "working again"), Automatic export results, finished exports, security changes (even ones the user made), and the morning charging summary. Each kind can be turned off. "Automatic charging updated your inverter" isn't sent on its own: the morning summary covers it.
 
 To test by hand: `curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://kelpwatt.angelov.uk/api/cron/notify` replies with counts.
 

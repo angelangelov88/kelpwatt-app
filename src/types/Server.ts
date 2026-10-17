@@ -143,6 +143,10 @@ type AutomationStateRow = {
   automatic_export_message: string | null;
   // The UK date (YYYY-MM-DD) the morning charging summary was last written.
   summary_on: string | null;
+  // When automatic charging's current run of failed checks started (null when
+  // the last one worked), and whether a notification was sent for it.
+  failing_since: Date | null;
+  failure_notified: boolean;
 };
 
 // The /api/cron/update reply. Counts only: GitHub Actions logs are public.

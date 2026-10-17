@@ -42,6 +42,9 @@ const toUkMinutes = (date: Date) => {
   return get("hour") * 60 + get("minute");
 };
 
+// UK time of day, "HH:MM".
+const toUkClock = (date: Date) => ukTime.format(date);
+
 const pad = (n: number) => String(n).padStart(2, "0");
 
 // `end` may run past midnight (above DAY) for a period that crosses it.
@@ -216,6 +219,7 @@ const diffPlan = (before: string, after: string, now = new Date()) => {
 
 export {
   toUkMinutes,
+  toUkClock,
   buildChargePlan,
   describePlan,
   describePeriods,

@@ -27,6 +27,14 @@ type ChargePlan = {
 // `firstStart` is the earliest real start time it came from, for "soonest first".
 type Piece = { start: number; end: number; firstStart: number };
 
+// What automatic charging set the inverter to, and when, for the morning
+// summary. slots: as describePlan writes them. beforeNight: set before 18:00,
+// so it was what the inverter had when the night started.
+// A time in the night, in minutes from 18:00 UK (src/lib/chargingSummary.ts).
+type Span = { start: number; end: number };
+
+type NightPlan = { at: Date; slots: string; beforeNight: boolean };
+
 type SlotsData = { plannedDispatches: Dispatch[] } | undefined;
 
 type PowerDownSession = {
@@ -106,6 +114,8 @@ export type {
   ChargeSettings,
   ChargePlan,
   Piece,
+  NightPlan,
+  Span,
   SlotsData,
   PowerDownSession,
   SavingSessionsData,

@@ -41,8 +41,13 @@ const categoryOf = ({
   const result = field(details, "result");
   const ok = field(details, "ok");
   switch (action) {
+    // A failure is sent straight away only when the user must do something,
+    // or once it's lasted (still_failing); "working again" only after one of
+    // those (api/_lib/automation.ts sets notify).
     case "automation_run":
-      return result === "failed" || result === "recovered"
+      return result === "still_failing" ||
+        ((result === "failed" || result === "recovered") &&
+          field(details, "notify") === true)
         ? "failures"
         : undefined;
     case "automatic_export_run":

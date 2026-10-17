@@ -129,6 +129,15 @@ const describeAutomation = (details: unknown): ActivityDescription => {
         ]),
         failed: true,
       };
+    // Written once a failure has lasted half an hour.
+    case "still_failing": {
+      const since = text(details, "since");
+      return {
+        title: "Automatic charging still isn't working",
+        detail: join([since && `Since ${since}`, text(details, "message")]),
+        failed: true,
+      };
+    }
     case "recovered":
       return {
         title: "Automatic charging is working again",
@@ -224,35 +233,35 @@ const describePreset = (details: unknown, key: "high" | "low") => {
 };
 
 // The morning charging summary: the battery level now, the user's window and
-// the Octopus slots added or finished overnight, and how many checks failed.
+// the other times it was set to charge overnight, and how many checks failed.
+// It only counts as a problem if automatic charging was still failing then
+// (problem: its message). Entries from before that was recorded don't have it.
 const describeChargingSummary = (details: unknown): ActivityDescription => {
   const soc = number(details, "soc");
   const failures = number(details, "failures") ?? 0;
   const window = text(details, "window");
   const slots = text(details, "slots");
-  const battery =
+  const problem = text(details, "problem");
+  const detail = join([
     soc !== undefined
       ? `Battery at ${String(soc)}%`
-      : "Couldn't read your battery level";
-  if (failures > 0)
-    return {
-      title: "Automatic charging had a problem last night",
-      detail: join([
-        battery,
-        `${String(failures)} failed check${failures === 1 ? "" : "s"}`,
-      ]),
-      failed: true,
-    };
-  return {
-    title: "Last night's charging",
-    detail: join([
-      battery,
-      window && `your ${formatSlots(window)} window`,
-      slots && `Octopus slots ${formatSlots(slots)}`,
-      !window && !slots && "no charge times",
-    ]),
-    failed: false,
-  };
+      : "Couldn't read your battery level",
+    window && `your ${formatSlots(window)} window`,
+    slots && `${window ? "plus " : ""}Octopus slots ${formatSlots(slots)}`,
+    !window && !slots && "no charge times",
+    ...(problem
+      ? [
+          `still not working: ${problem}`,
+          flag(details, "paused") && "Paused until you update your saved login",
+        ]
+      : [
+          failures > 0 &&
+            `${String(failures)} check${failures === 1 ? "" : "s"} failed, later ones worked`,
+        ]),
+  ]);
+  return problem
+    ? { title: "Automatic charging isn't working", detail, failed: true }
+    : { title: "Last night's charging", detail, failed: false };
 };
 
 const describeActivity = ({
