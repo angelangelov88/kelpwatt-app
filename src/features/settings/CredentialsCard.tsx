@@ -46,8 +46,9 @@ const CredentialsCard = () => {
     return (
       <div className="flex flex-col gap-6">
         <p className="text-sm text-gray-400">
-          Checked with Growatt and Octopus, then stored encrypted. They&apos;re
-          never shown again, not even to you.
+          Kelpwatt works with Growatt SPH inverters. Your details are checked
+          with Growatt and Octopus, then stored encrypted. They&apos;re never
+          shown again, not even to you.
         </p>
         {rows.map(({ provider, saved }) => (
           <CredentialsRow

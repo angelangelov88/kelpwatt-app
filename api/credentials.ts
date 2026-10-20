@@ -70,6 +70,36 @@ const growattUnavailable = (
   outage: outageKind(err),
 });
 
+// Kelpwatt sends only the commands for Growatt's "mix" kind (SPH inverters).
+// The names of other kinds a user might have; any other gets a general message.
+const INVERTER_KINDS: Record<string, string> = {
+  tlx: "a MIN or MOD inverter",
+  spa: "an SPA inverter",
+  max: "a MAX inverter",
+};
+
+// Another kind of inverter doesn't answer the "mix" commands, which looks
+// like an outage, so its kind is checked first. Only a kind Growatt names
+// stops the check: if the lookup fails, reading the inverter decides.
+const unsupportedInverter = async (
+  client: ReturnType<typeof growattClientFor>,
+  serial: string,
+): Promise<CredentialProblem | null> => {
+  const type = await client.fetchDeviceType(serial).catch((err: unknown) => {
+    console.warn("growatt device type: lookup failed", outageKind(err));
+    return "";
+  });
+  // Only the kind's short name, e.g. "mix": it helps support someone whose
+  // inverter won't answer, and says nothing about them.
+  if (type !== "") console.info("growatt device type:", type ?? "not listed");
+  if (!type || type === "mix") return null;
+  return {
+    code: "growatt_unsupported_inverter",
+    message: `Kelpwatt only works with Growatt SPH inverters for now, and Growatt lists this one as ${INVERTER_KINDS[type] ?? "a different kind of inverter"}`,
+    step: "inverter",
+  };
+};
+
 const octopusUnavailable = (
   step: CredentialStep,
   err: unknown,
@@ -99,6 +129,8 @@ const check = async (
         step: "login",
       };
     }
+    const unsupported = await unsupportedInverter(client, body.serial);
+    if (unsupported) return unsupported;
     try {
       await client.fetchChargePeriods(body.serial);
     } catch (err) {

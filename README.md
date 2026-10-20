@@ -2,7 +2,7 @@
 
 # Kelpwatt
 
-A web app that connects a **Growatt** solar/battery inverter to an **Octopus Energy** account. It shows the inverter's charge settings next to Octopus's planned charging times (Intelligent Octopus dispatches) and can apply those times to the inverter, by hand or automatically through the night. It also lists Octopus saving sessions ("Power Down") and lets you join them.
+A web app that connects a **Growatt** SPH solar/battery inverter to an **Octopus Energy** account. Only Growatt's MIX commands (SPH) are implemented; saving a Growatt login is refused when Growatt lists the inverter as another kind (MIN/MOD, SPA, MAX). It shows the inverter's charge settings next to Octopus's planned charging times (Intelligent Octopus dispatches) and can apply those times to the inverter, by hand or automatically through the night. It also lists Octopus saving sessions ("Power Down") and lets you join them.
 
 Live at **https://kelpwatt.angelov.uk**. The beta takes up to 20 users; each connects their own Growatt and Octopus accounts.
 

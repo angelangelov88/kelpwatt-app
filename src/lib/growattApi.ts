@@ -22,6 +22,8 @@ const MIN_REQUEST_MS = 2_000;
 // less time left than this, so it isn't stopped halfway with slots 1–3 changed
 // and 4–6 not.
 const WRITE_NEEDS_MS = 20_000;
+// Pages of a plant's device list to look through for an inverter.
+const MAX_DEVICE_PAGES = 5;
 
 // ─── Factory ──────────────────────────────────────────────────────────────────
 // Used by the server (one client per user) and the Node script. Each caller
@@ -249,14 +251,11 @@ const createGrowattClient = ({
     };
   };
 
-  // How full the battery is now, in percent. It's Growatt's copy, updated
-  // about every 5 minutes, so it doesn't use the inverter queue. The status
-  // needs the plant the inverter is in, so each of the account's plants is
-  // tried until one knows the serial.
-  const fetchBatterySoc = async (serial: string) => {
-    await ensureLoggedIn();
+  // The ids of the account's plants (sites). Growatt's copy of the data, so
+  // these calls don't use the inverter queue.
+  const fetchPlantIds = async () => {
     const plants = (await request("/index/getPlantListTitle", {})) as unknown;
-    const ids = Array.isArray(plants)
+    return Array.isArray(plants)
       ? plants
           .map((p: unknown) =>
             typeof p === "object" && p !== null && "id" in p
@@ -265,7 +264,48 @@ const createGrowattClient = ({
           )
           .filter((id) => /^\d+$/.test(id))
       : [];
-    for (const id of ids) {
+  };
+
+  // What kind of device Growatt lists the serial as: "mix" for SPH inverters,
+  // whose commands this client sends, or "tlx", "spa", "max" and so on. null
+  // when no plant lists it.
+  const fetchDeviceType = async (serial: string) => {
+    await ensureLoggedIn();
+    const wanted = serial.toUpperCase();
+    for (const id of await fetchPlantIds()) {
+      for (let page = 1; page <= MAX_DEVICE_PAGES; page++) {
+        const reply = (await request("/panel/getDevicesByPlantList", {
+          plantId: id,
+          currPage: String(page),
+        })) as GrowattResponse & {
+          obj?: { datas?: unknown; pages?: unknown };
+        };
+        const devices = Array.isArray(reply.obj?.datas) ? reply.obj.datas : [];
+        for (const device of devices as unknown[]) {
+          if (typeof device !== "object" || device === null) continue;
+          const { sn, deviceTypeName, deviceType } = device as Record<
+            string,
+            unknown
+          >;
+          if (String(sn).toUpperCase() !== wanted) continue;
+          const name =
+            typeof deviceTypeName === "string" ? deviceTypeName : deviceType;
+          const type = typeof name === "string" ? name.toLowerCase() : "";
+          return /^[a-z0-9_]{1,20}$/.test(type) ? type : null;
+        }
+        if (page >= Number(reply.obj?.pages ?? 1)) break;
+      }
+    }
+    return null;
+  };
+
+  // How full the battery is now, in percent. It's Growatt's copy, updated
+  // about every 5 minutes, so it doesn't use the inverter queue. The status
+  // needs the plant the inverter is in, so each of the account's plants is
+  // tried until one knows the serial.
+  const fetchBatterySoc = async (serial: string) => {
+    await ensureLoggedIn();
+    for (const id of await fetchPlantIds()) {
       const status = (await request(
         `/panel/mix/getMIXStatusData?plantId=${id}`,
         {
@@ -289,6 +329,8 @@ const createGrowattClient = ({
     login: () => enqueue(ensureLoggedIn),
 
     fetchBatterySoc,
+
+    fetchDeviceType,
 
     // all: also read slots 4–6 when 1–3 aren't all on (3s slower).
     fetchChargePeriods: (serial: string, all = false): Promise<ChargePeriods> =>

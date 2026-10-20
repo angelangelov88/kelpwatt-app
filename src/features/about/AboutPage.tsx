@@ -36,7 +36,11 @@ const AboutPage = () => (
     </LegalSection>
 
     <LegalSection title="What it does">
-      <p>Kelpwatt connects your Growatt inverter to your Octopus account.</p>
+      <p>
+        Kelpwatt connects your Growatt SPH inverter to your Octopus account.
+        Other Growatt inverters, such as the MIN, MOD and SPA, aren&apos;t
+        supported yet.
+      </p>
       <ul className="list-disc pl-5 flex flex-col gap-2">
         <li>
           <strong className="text-gray-100">

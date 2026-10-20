@@ -64,6 +64,8 @@ const SIGN_IN_METHODS: Record<string, string> = {
 const CHECK_FAILURES: Record<string, string> = {
   growatt_login_failed: "Wrong Growatt username or password",
   growatt_serial_failed: "The inverter serial number didn't match the account",
+  growatt_unsupported_inverter:
+    "Kelpwatt doesn't support this kind of inverter yet",
   octopus_key_failed: "Octopus didn't recognise the API key",
   octopus_account_failed: "The account number didn't match the API key",
   growatt_in_use: "That inverter is already linked to another Kelpwatt account",
