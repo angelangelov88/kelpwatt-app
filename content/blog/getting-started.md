@@ -10,7 +10,7 @@ This guide takes you from a new account to a working dashboard.
 
 ## What you need
 
-- A Growatt inverter and battery that you can see in the ShinePhone app or on server.growatt.com.
+- A Growatt SPH inverter and battery that you can see in the ShinePhone app or on server.growatt.com. Other Growatt inverters, such as the MIN, MOD and SPA, aren't supported yet: they use different settings, and Kelpwatt tells you if yours is one of them when you add your Growatt login.
 - Your Growatt username, password and inverter serial number.
 - Optional: an Octopus Energy account, if you want automatic charging around your car's charging slots and saving sessions.
 
