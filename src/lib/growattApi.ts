@@ -25,6 +25,16 @@ const WRITE_NEEDS_MS = 20_000;
 // Pages of a plant's device list to look through for an inverter.
 const MAX_DEVICE_PAGES = 5;
 
+// Growatt's failure codes, in words. Its replies aren't passed on as they are,
+// so any other code gets the general message.
+const GROWATT_FAILURES: Record<string, string> = {
+  inv_set_failure:
+    "The inverter didn't confirm the change. It sometimes makes it anyway, so it's worth checking again in a few minutes",
+};
+const describeFailure = (msg: string | undefined) =>
+  (msg !== undefined && GROWATT_FAILURES[msg.trim().toLowerCase()]) ||
+  "Growatt couldn't do that just now, try again in a few minutes";
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 // Used by the server (one client per user) and the Node script. Each caller
 // passes its own credentials and URL builder.
@@ -103,7 +113,7 @@ const createGrowattClient = ({
       return request(path, body, true);
     }
 
-    if (json.success === false) throw new Error(json.msg ?? "Request failed");
+    if (json.success === false) throw new Error(describeFailure(json.msg));
 
     return json;
   };
@@ -209,7 +219,7 @@ const createGrowattClient = ({
         return { msg, values };
       if (attempt >= READ_ATTEMPTS)
         throw new Error(
-          `Inverter returned no data for ${paramId} — it may be busy, try again`,
+          "The inverter didn't send its settings. It may be busy, try again in a few minutes",
         );
       console.warn(
         `${paramId}: empty reply (attempt ${String(attempt)}/${String(READ_ATTEMPTS)}), retrying in ${String(READ_RETRY_MS / 1000)}s`,
