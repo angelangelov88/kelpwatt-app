@@ -109,6 +109,8 @@ type HappyHoursData = {
   tokenBalance: number | null;
   // Every happy hour Octopus currently lists, with your booked status.
   events: HappyHour[];
+  // When each happy hour you booked starts, including ones no longer listed.
+  bookedStarts: Date[];
 };
 
 type RawHappyHours = {
@@ -122,7 +124,9 @@ type RawHappyHours = {
     account: {
       signedUpMeterPoint: { regionId: number } | null;
       tokenBalance: number | null;
-      joinedEvents: { eventId: string | number; eventType: string }[] | null;
+      joinedEvents:
+        | { eventId: string | number; eventType: string; startAt: string }[]
+        | null;
     } | null;
   } | null;
 };

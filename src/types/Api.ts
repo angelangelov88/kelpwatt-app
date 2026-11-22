@@ -104,6 +104,7 @@ type HappyHours = {
   region: number | null;
   tokenBalance: number | null;
   events: HappyHourJson[];
+  bookedStarts: string[];
 };
 
 // POST /api/octopus/join and POST /api/octopus/book

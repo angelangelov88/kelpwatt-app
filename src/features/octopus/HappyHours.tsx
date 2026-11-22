@@ -5,7 +5,12 @@ import NotReadYet from "../../components/NotReadYet";
 import SectionHeading from "./SectionHeading";
 import useToast from "../../contexts/useToast";
 import useHappyHours, { useBookHappyHour } from "./useHappyHours";
-import { cantBookReason, upcomingHappyHours } from "../../lib/happyHours";
+import {
+  MAX_BOOKINGS_PER_WEEKEND,
+  cantBookReason,
+  upcomingHappyHours,
+  weekendLimitReached,
+} from "../../lib/happyHours";
 import { sessionStatus } from "../../lib/savingSessions";
 import type { HappyHour } from "../../types/Octopus";
 
@@ -86,6 +91,10 @@ const HappyHours = () => {
                 <b>Book</b> spends your tokens on one. It only shows when
                 there&apos;s a place left and you have enough tokens.
               </li>
+              <li>
+                Octopus normally lets you book {MAX_BOOKINGS_PER_WEEKEND} happy
+                hours a weekend, so Book is turned off once you have.
+              </li>
             </ul>
           </InfoTip>
           {query.isFetching && (
@@ -130,6 +139,8 @@ const HappyHours = () => {
               {upcoming.map((h) => {
                 const reason = cantBookReason(h, data.tokenBalance, now);
                 const canBook = !h.booked && reason === null;
+                // Shown, but disabled, once the weekend's bookings are used up.
+                const atLimit = canBook && weekendLimitReached(h, data);
                 const isBooking = book.isPending && book.variables === h.code;
                 return (
                   <div
@@ -154,7 +165,11 @@ const HappyHours = () => {
                     <span
                       className={`flex-1 text-center text-xs font-medium ${h.booked ? "text-emerald-400" : "text-gray-500"}`}
                     >
-                      {h.booked ? "Booked" : "Not booked"}
+                      {h.booked
+                        ? "Booked"
+                        : atLimit
+                          ? `${String(MAX_BOOKINGS_PER_WEEKEND)} booked this weekend`
+                          : "Not booked"}
                     </span>
                     <div className="flex-1 flex justify-end">
                       {canBook ? (
@@ -162,7 +177,9 @@ const HappyHours = () => {
                           onClick={() => {
                             handleBook(h);
                           }}
-                          disabled={book.isPending || query.isFetching}
+                          disabled={
+                            atLimit || book.isPending || query.isFetching
+                          }
                           className={`${smallButton} bg-blue-600 hover:bg-blue-500 disabled:hover:bg-blue-600`}
                         >
                           {isBooking ? "Booking…" : "Book"}

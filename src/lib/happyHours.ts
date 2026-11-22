@@ -24,12 +24,17 @@ const QUERY = `query HappyHours($account: String!) {
     account(accountNumber: $account) {
       signedUpMeterPoint { regionId }
       tokenBalance
-      joinedEvents { eventId eventType }
+      joinedEvents { eventId eventType startAt }
     }
   }
 }`;
 
 const HAPPY_HOUR = "WEEKEND_HAPPY_HOUR";
+
+// Octopus normally lets you book up to two happy hours a weekend. It sometimes
+// doubles that on special weekends, which its API doesn't show, so on those
+// weekends this stops you at two.
+const MAX_BOOKINGS_PER_WEEKEND = 2;
 
 const CAPACITIES: readonly string[] = [
   "AVAILABLE",
@@ -51,11 +56,10 @@ const fetchHappyHours = async (
   );
   if (!data) throw new OctopusError("No happy hour data returned from Octopus");
 
-  const bookedIds = new Set(
-    (data.account?.joinedEvents ?? [])
-      .filter((e) => e.eventType === HAPPY_HOUR)
-      .map((e) => String(e.eventId)),
+  const booked = (data.account?.joinedEvents ?? []).filter(
+    (e) => e.eventType === HAPPY_HOUR,
   );
+  const bookedIds = new Set(booked.map((e) => String(e.eventId)));
 
   const events = (data.events ?? [])
     .filter((e) => e.eventType === HAPPY_HOUR)
@@ -76,6 +80,7 @@ const fetchHappyHours = async (
     region: data.account?.signedUpMeterPoint?.regionId ?? null,
     tokenBalance: data.account?.tokenBalance ?? null,
     events,
+    bookedStarts: booked.map((e) => new Date(e.startAt)),
   };
 };
 
@@ -124,4 +129,36 @@ const cantBookReason = (
   return null;
 };
 
-export { fetchHappyHours, bookHappyHour, upcomingHappyHours, cantBookReason };
+const ukDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/London" });
+const ukWeekday = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short",
+  timeZone: "Europe/London",
+});
+
+// The weekend a time falls in, as its Saturday's UK date (YYYY-MM-DD). A Sunday
+// belongs to the day before; any other day is its own.
+const weekendOf = (d: Date) => {
+  const date = ukDate.format(d);
+  if (ukWeekday.format(d) !== "Sun") return date;
+  const [y, m, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, day - 1)).toISOString().slice(0, 10);
+};
+
+// True when you've already booked as many happy hours as Octopus allows in
+// this one's weekend.
+const weekendLimitReached = (h: HappyHour, data: HappyHoursData) => {
+  const weekend = weekendOf(h.startAt);
+  return (
+    data.bookedStarts.filter((s) => weekendOf(s) === weekend).length >=
+    MAX_BOOKINGS_PER_WEEKEND
+  );
+};
+
+export {
+  MAX_BOOKINGS_PER_WEEKEND,
+  fetchHappyHours,
+  bookHappyHour,
+  upcomingHappyHours,
+  cantBookReason,
+  weekendLimitReached,
+};
