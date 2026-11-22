@@ -23,6 +23,7 @@ import type {
   dailyExportSchema,
   automaticExportSchema,
   exportPresetsSchema,
+  happyHoursSchema,
   notificationsSchema,
   settingsSchema,
   themeSchema,
@@ -134,6 +135,10 @@ type DailyExport = z.infer<typeof dailyExportSchema>;
 // a set time.
 type AutomaticExport = z.infer<typeof automaticExportSchema>;
 
+// PUT /api/settings?part=happy: charging during, and exporting before, the
+// happy hours the user booked.
+type HappyHourSettings = z.infer<typeof happyHoursSchema>;
+
 // PUT /api/settings?part=battery: battery size and max discharge power.
 type BatteryInfo = z.infer<typeof batterySchema>;
 
@@ -152,6 +157,7 @@ type Settings = ChargeSettings & {
   exportPresets: ExportPresets;
   exportEveryDay: boolean;
   automaticExport: AutomaticExport;
+  happyHours: HappyHourSettings;
   theme: Theme;
   notifications: NotificationPrefs;
 } & { [K in keyof BatteryInfo]: BatteryInfo[K] | null };
@@ -267,6 +273,7 @@ export type {
   Preset,
   DailyExport,
   AutomaticExport,
+  HappyHourSettings,
   BatteryInfo,
   ThemeSetting,
   Theme,

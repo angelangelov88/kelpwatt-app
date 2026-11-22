@@ -91,6 +91,38 @@ const automaticExportSchema = z
     path: ["minSOC"],
   });
 
+// PUT /api/settings?part=happy: what to do around the happy hours the user
+// booked with Octopus. Both need automatic charging on.
+const happyHoursSchema = z
+  .object({
+    // Charge during each one.
+    chargeEnabled: z.boolean(),
+    // Charge power, percent of the inverter's maximum.
+    chargePowerRate: stepSchema,
+    // Charge up to this battery level, in percent.
+    chargeStopSOC: stepSchema,
+    // Before each one, export what the happy hour can charge back.
+    exportEnabled: z.boolean(),
+    // Discharge power, percent of the inverter's maximum.
+    exportPowerRate: stepSchema,
+    // Never export below this battery level, in percent.
+    exportStopSOC: stepSchema,
+    // Only export if the battery is at least this full, in percent.
+    exportMinSOC: stepSchema,
+  })
+  .refine((s) => s.exportMinSOC > s.exportStopSOC, {
+    message: "Must be above the stop level",
+    path: ["exportMinSOC"],
+  })
+  .refine((s) => !s.exportEnabled || s.chargeStopSOC > s.exportStopSOC, {
+    message: "Must be above the export stop level",
+    path: ["chargeStopSOC"],
+  })
+  .refine((s) => !s.exportEnabled || s.chargeEnabled, {
+    message: "Turn on charging during happy hours first",
+    path: ["exportEnabled"],
+  });
+
 // PUT /api/settings?part=battery: what the Export until battery % button
 // works the end time out from. Growatt doesn't give either.
 const batterySchema = z.object({
@@ -139,6 +171,16 @@ const defaultAutomaticExport: z.infer<typeof automaticExportSchema> = {
   minSOC: 50,
 };
 
+const defaultHappyHours: z.infer<typeof happyHoursSchema> = {
+  chargeEnabled: false,
+  chargePowerRate: 100,
+  chargeStopSOC: 100,
+  exportEnabled: false,
+  exportPowerRate: 95,
+  exportStopSOC: 20,
+  exportMinSOC: 50,
+};
+
 const defaultExportPresets: z.infer<typeof exportPresetsSchema> = {
   high: {
     name: "High Export",
@@ -163,10 +205,12 @@ export {
   exportPresetsSchema,
   dailyExportSchema,
   automaticExportSchema,
+  happyHoursSchema,
   batterySchema,
   themeSchema,
   notificationsSchema,
   defaultSettings,
   defaultExportPresets,
   defaultAutomaticExport,
+  defaultHappyHours,
 };

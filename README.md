@@ -29,6 +29,7 @@ The logo shows energy flowing into a battery (the violet arrow) and back out to 
   - Export to grid settings: an Export every day switch. Growatt clears the export times every night at 23:30; with it on, the 5-minute check puts back the ones last applied on the dashboard a few minutes later
   - the Export to grid presets: each one's name, times, discharge power and stop SOC
   - Automatic export: Export until battery % every evening at a chosen time, with its discharge rate, stop level and the minimum battery level to run at. Needs Growatt and the battery details. With Octopus, skipped while the car is plugged in (Intelligent Octopus has charging planned); without it there's no car check. Also skipped if the battery is below that minimum, or if the export would last under 5 minutes; every run and skip shows in Activity
+  - Happy hours (needs automatic charging, Growatt and Octopus): charge during each booked happy hour at its own charge rate and level (its times go on the inverter 30 minutes before it starts and come off when it ends), and optionally export before it. The export works out what the happy hour can charge back (charge rate x max discharge kW x hours, counting 90%, as a % of the battery), exports down to that (never below its stop level) and ends the minute the happy hour starts. Back-to-back happy hours count as one. Skipped like Automatic export (car plugged in, battery below the minimum, under 5 minutes, an Export until battery % already running). The user's own export times are put back afterwards, without any during the happy hour. If the happy hour is cancelled or moved while it's exporting, the next check stops the export early and puts them back. If only part of it is cancelled (one of two back-to-back bookings), the export's stop level is raised to what the rest can charge back. Needs the battery details
   - your battery: its size and max discharge power, for Export until battery % (Growatt doesn't give them)
   - password and MFA
   - data export and account deletion
@@ -186,6 +187,7 @@ This is how production is set up, and what you'd repeat for a fresh copy.
    | `0014_unique_credentials` | One account per inverter and per Octopus account                    |
    | `0015_push`               | Push notifications: devices, kinds, the once-a-minute sender        |
    | `0016_failure_notify`     | Failure notifications only once a problem lasts or needs the user   |
+   | `0017_happy_hours`        | Charging during, and exporting before, booked happy hours           |
 
    There's no migration tool. Each migration is applied by hand, once. Before `0007`, store `CRON_SECRET` in Vault (see [Automatic charging](#automatic-charging)).
 
@@ -321,7 +323,7 @@ The first scheduled check after 07:00 UK time also writes a `charging_summary` a
 
 Users turn notifications on per device in Settings (`public/sw.js` shows them; `POST /api/push` saves the device). Nothing is sent where activity happens. Instead, `0015_push` adds a `push-notify` job that runs `private.schedule_push()` every minute. When there are new audit log rows for users with a device on, it calls `POST /api/cron/notify` (with the Vault `cron_secret`), which takes the rows, turns the ones the user wants into notifications (`src/lib/notifications.ts`, using the Activity page's words) and sends them. Otherwise it just moves past them. Rows older than an hour are skipped, and push services drop a notification after 12 hours if the device is off. A device the push service says is gone is deleted.
 
-Sent: background failures (automatic charging's only when the user has to act, or after 30 minutes of failed checks, then "working again"), Automatic export results, finished exports, security changes (even ones the user made), and the morning charging summary. Each kind can be turned off. "Automatic charging updated your inverter" isn't sent on its own: the morning summary covers it.
+Sent: background failures (automatic charging's only when the user has to act, or after 30 minutes of failed checks, then "working again"), Automatic export and happy hour export results, finished exports, security changes (even ones the user made), and the morning charging summary. Each kind can be turned off. "Automatic charging updated your inverter" isn't sent on its own: the morning summary covers it.
 
 To test by hand: `curl -X POST -H "Authorization: Bearer $CRON_SECRET" https://kelpwatt.angelov.uk/api/cron/notify` replies with counts.
 

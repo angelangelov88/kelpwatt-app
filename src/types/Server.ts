@@ -64,7 +64,9 @@ type AuditAction =
   | "one_off_ended"
   | "automatic_export_saved"
   | "automatic_export_run"
-  | "charging_summary";
+  | "charging_summary"
+  | "happy_hours_saved"
+  | "happy_export_run";
 
 // Which call of a credentials check went wrong: Growatt's login or the
 // inverter read with the serial, Octopus's API key or the account number.
@@ -97,6 +99,7 @@ type AutomaticExportResult =
   | "already"
   | "too_late"
   | "too_short"
+  | "shortened"
   | "failed";
 
 // What an automation check did for one user. skipped: automation is off.
@@ -149,6 +152,19 @@ type AutomationStateRow = {
   // the last one worked), and whether a notification was sent for it.
   failing_since: Date | null;
   failure_notified: boolean;
+  // Settings → Happy hours export: the start of the happy hour it last ran,
+  // was skipped or given up for; and the code of the last failure logged for
+  // it, null if none.
+  happy_export_for: Date | null;
+  happy_export_code: string | null;
+  // The battery level the running export before a happy hour stops at, null
+  // when none is running.
+  happy_export_target: number | null;
+  // The export times to put back when the one-off slot ends (as
+  // describePeriods writes them), null to just turn it off.
+  one_off_restore_power: number | null;
+  one_off_restore_stop: number | null;
+  one_off_restore_slots: string | null;
 };
 
 // The /api/cron/update reply. Counts only: GitHub Actions logs are public.

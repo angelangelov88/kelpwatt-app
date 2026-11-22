@@ -1,6 +1,7 @@
 import {
   defaultAutomaticExport,
   defaultExportPresets,
+  defaultHappyHours,
   defaultSettings,
 } from "../../src/lib/settingsSchema";
 import { keptPlan } from "../../src/lib/dailyExport";
@@ -33,6 +34,13 @@ type SettingsRow = {
   automatic_export_power: number | null;
   automatic_export_stop: number | null;
   automatic_export_min_soc: number | null;
+  happy_charge: boolean;
+  happy_charge_power: number | null;
+  happy_charge_stop: number | null;
+  happy_export: boolean;
+  happy_export_power: number | null;
+  happy_export_stop: number | null;
+  happy_export_min_soc: number | null;
   notify_failures: boolean;
   notify_automatic_export: boolean;
   notify_exports: boolean;
@@ -66,6 +74,8 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
       battery_max_kw::float8 as battery_max_kw,
       automatic_export, automatic_export_at::text as automatic_export_at,
       automatic_export_power, automatic_export_stop, automatic_export_min_soc,
+      happy_charge, happy_charge_power, happy_charge_stop, happy_export,
+      happy_export_power, happy_export_stop, happy_export_min_soc,
       theme, notify_failures, notify_automatic_export, notify_exports,
       notify_security, notify_summary
     from private.user_settings`;
@@ -97,6 +107,17 @@ const readSettings = async (tx: Tx): Promise<Settings> => {
         row?.automatic_export_power ?? defaultAutomaticExport.powerRate,
       stopSOC: row?.automatic_export_stop ?? defaultAutomaticExport.stopSOC,
       minSOC: row?.automatic_export_min_soc ?? defaultAutomaticExport.minSOC,
+    },
+    happyHours: {
+      chargeEnabled: row?.happy_charge ?? false,
+      chargePowerRate:
+        row?.happy_charge_power ?? defaultHappyHours.chargePowerRate,
+      chargeStopSOC: row?.happy_charge_stop ?? defaultHappyHours.chargeStopSOC,
+      exportEnabled: row?.happy_export ?? false,
+      exportPowerRate:
+        row?.happy_export_power ?? defaultHappyHours.exportPowerRate,
+      exportStopSOC: row?.happy_export_stop ?? defaultHappyHours.exportStopSOC,
+      exportMinSOC: row?.happy_export_min_soc ?? defaultHappyHours.exportMinSOC,
     },
     batteryKwh: row?.battery_kwh ?? null,
     maxDischargeKw: row?.battery_max_kw ?? null,

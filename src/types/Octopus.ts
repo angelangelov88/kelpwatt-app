@@ -148,6 +148,23 @@ type RawHappyHours = {
   } | null;
 };
 
+// Booked happy hours that touch or overlap, joined into one stretch.
+type HappyBlock = { start: Date; end: Date };
+
+// Whether the export before a happy hour should start: due (read the battery
+// now), late (too close to the happy hour to be worth it), or wait.
+type HappyExportStatus = "due" | "late" | "wait";
+
+// The settings and battery details the export before a happy hour uses.
+type HappyExportInput = {
+  chargePowerRate: number;
+  chargeStopSOC: number;
+  exportPowerRate: number;
+  exportStopSOC: number;
+  batteryKwh: number;
+  maxDischargeKw: number;
+};
+
 type SessionStatus = "upcoming" | "in progress" | "ended";
 
 type HistoryDays = 7 | 30 | 365;
@@ -183,6 +200,9 @@ type SectionHeadingProps = { children: string };
 
 export type {
   Dispatch,
+  HappyBlock,
+  HappyExportStatus,
+  HappyExportInput,
   Slots,
   ChargeSettings,
   ChargePlan,

@@ -48,7 +48,9 @@ const PrivacyPage = () => (
           window and whether it&apos;s used, charge power, battery stop level
           and whether automatic charging is on, your Automatic export settings
           (whether it&apos;s on, its time, discharge rate, stop level and
-          minimum battery level), the theme you chose (light, dark or your
+          minimum battery level), your happy hour settings (whether to charge
+          during and export before the happy hours you book, with their rates
+          and battery levels), the theme you chose (light, dark or your
           device&apos;s setting), and which kinds of notification you want.
         </li>
         <li>
@@ -67,7 +69,10 @@ const PrivacyPage = () => (
           changed, and why the last check failed, if it did. We keep these so we
           only change your inverter when your plan changes. If you turn
           Automatic export on, the last day it ran and why tonight&apos;s last
-          try failed, if it did, so it runs at most once an evening.
+          try failed, if it did, so it runs at most once an evening. If you
+          export before happy hours, the last happy hour it ran for and why its
+          last try failed, if it did, the battery level the export stops at, and
+          the export times to put back on your inverter afterwards.
         </li>
         <li>
           <strong className="text-gray-100">An activity log:</strong> a record
@@ -79,10 +84,11 @@ const PrivacyPage = () => (
           sessions you join, happy hours you book or cancel, automatic charging
           checks that changed your inverter, started failing or started working
           again, each evening&apos;s Automatic export (when it started or why it
-          was skipped, with your battery level at the time), and downloads of
-          your data, and a summary of each night&apos;s automatic charging with
-          your battery level the next morning. It never contains passwords or
-          keys. You can read it on the Activity page.
+          was skipped, with your battery level at the time), each export before
+          a happy hour (the same), and downloads of your data, and a summary of
+          each night&apos;s automatic charging with your battery level the next
+          morning. It never contains passwords or keys. You can read it on the
+          Activity page.
         </li>
         <li>
           <strong className="text-gray-100">Messages you send us:</strong> if
@@ -103,8 +109,9 @@ const PrivacyPage = () => (
         times, saving sessions, happy hours (including the electricity you used
         and any credit for ones you booked) and token balance from Octopus. With
         automatic charging on, it fetches your planned charging times every 5
-        minutes. These are fetched when needed and not stored, apart from what
-        the activity log and the automatic charging status record.
+        minutes, and with charging during happy hours on, the happy hours you
+        booked too. These are fetched when needed and not stored, apart from
+        what the activity log and the automatic charging status record.
       </p>
     </LegalSection>
 

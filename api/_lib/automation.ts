@@ -14,8 +14,17 @@ import {
   toUkMinutes,
 } from "../../src/lib/chargePlan";
 import { slotsThatRan } from "../../src/lib/chargingSummary";
-import { resetDay, ukDay } from "../../src/lib/dailyExport";
-import { planExportUntil } from "../../src/lib/exportUntil";
+import { keptPlan, resetDay, ukDay } from "../../src/lib/dailyExport";
+import { planExportBefore, planExportUntil } from "../../src/lib/exportUntil";
+import {
+  blocksToCharge,
+  describeBlocks,
+  exportTarget,
+  happyExportStatus,
+  happyHourBlocks,
+  slotsToRestore,
+} from "../../src/lib/happyHourAutomation";
+import { fetchHappyHours } from "../../src/lib/happyHours";
 import { GrowattDeadlineError } from "../../src/lib/growattApi";
 import {
   OctopusError,
@@ -23,7 +32,11 @@ import {
   obtainToken,
 } from "../../src/lib/octopusApi";
 import type { Settings } from "../../src/types/Api";
-import type { ChargePlan } from "../../src/types/Octopus";
+import type {
+  ChargePlan,
+  HappyBlock,
+  HappyExportInput,
+} from "../../src/types/Octopus";
 import type {
   AutomaticExportResult,
   AutomationOutcome,
@@ -95,7 +108,10 @@ const takeLease = async (userId: string) => {
         one_off_slot, one_off_failed,
         automatic_export_on::text as automatic_export_on,
         automatic_export_code, automatic_export_message,
-        summary_on::text as summary_on, failing_since, failure_notified`,
+        summary_on::text as summary_on, failing_since, failure_notified,
+        happy_export_for, happy_export_code, happy_export_target,
+        one_off_restore_power,
+        one_off_restore_stop, one_off_restore_slots`,
   );
   return rows.at(0) ?? null;
 };
@@ -106,25 +122,53 @@ const isKnownPlan = (state: AutomationStateRow, plan: ChargePlan) =>
   String(state.plan_power) === plan.powerRate &&
   String(state.plan_stop) === plan.stopSOC;
 
-const fetchDispatches = async (apiKey: string, account: string) => {
-  let token: string;
-  try {
-    token = await obtainToken(apiKey);
-  } catch (err) {
-    throw err instanceof OctopusError
-      ? new AutomationError(
-          "octopus_key_failed",
-          "Octopus didn't accept your saved API key. If you replaced it, update it in Settings",
-          true,
-        )
-      : new AutomationError("octopus_failed", octopusMessage(err));
-  }
-  try {
-    return await fetchPlannedDispatches(token, account);
-  } catch (err) {
-    throw new AutomationError("octopus_failed", octopusMessage(err));
-  }
+// Runs load the first time it's called, and hands back the same promise after
+// that.
+const once = <T>(load: () => Promise<T>) => {
+  let promise: Promise<T> | null = null;
+  return () => (promise ??= load());
 };
+
+// The user's Octopus calls for one check, each made at most once however many
+// of its parts need them.
+const octopusCalls = (apiKey: string, account: string) => {
+  const token = once(async () => {
+    try {
+      return await obtainToken(apiKey);
+    } catch (err) {
+      throw err instanceof OctopusError
+        ? new AutomationError(
+            "octopus_key_failed",
+            "Octopus didn't accept your saved API key. If you replaced it, update it in Settings",
+            true,
+          )
+        : new AutomationError("octopus_failed", octopusMessage(err));
+    }
+  });
+  return {
+    dispatches: once(async () => {
+      const t = await token();
+      try {
+        return await fetchPlannedDispatches(t, account);
+      } catch (err) {
+        throw new AutomationError("octopus_failed", octopusMessage(err));
+      }
+    }),
+    // The happy hours the user booked.
+    bookings: once(async () => {
+      const t = await token();
+      try {
+        return (await fetchHappyHours(t, account)).bookings;
+      } catch (err) {
+        throw new AutomationError("happy_hours_failed", octopusMessage(err));
+      }
+    }),
+  };
+};
+
+type OctopusCalls = ReturnType<typeof octopusCalls>;
+// null when the user has no Octopus details.
+type LoadOctopus = () => Promise<OctopusCalls | null>;
 
 type Growatt = NonNullable<Awaited<ReturnType<typeof loadGrowatt>>>;
 
@@ -210,33 +254,56 @@ const applyToInverter = async (
 // six slots, the plan changing doesn't (3s faster). reached: it did.
 // replaced: the times the inverter had, if it wrote; null if it didn't.
 // verified: the inverter was seen with the plan (false if not reached).
+// With Settings → Happy hours charging on, booked happy hours starting within
+// 30 minutes are charged in too, at their own power and stop level (Growatt
+// has one of each for every charge time). happyHours: their times, or "".
 const sync = async (
   userId: string,
   settings: Settings,
   state: AutomationStateRow,
+  octopus: LoadOctopus,
   force: boolean,
   deadline: number,
 ) => {
-  const [octopus, growatt] = await Promise.all([
-    loadOctopus(userId),
+  const [calls, growatt] = await Promise.all([
+    octopus(),
     loadGrowatt(userId, deadline),
   ]);
-  if (!octopus || !growatt)
+  if (!calls || !growatt)
     throw new AutomationError(
       "not_set_up",
       "Your Growatt or Octopus details are missing",
     );
+  const dispatches = await calls.dispatches();
+  const happy = settings.happyHours;
+  const charge = happy.chargeEnabled
+    ? blocksToCharge(happyHourBlocks(await calls.bookings()))
+    : [];
   const plan = buildChargePlan(
-    await fetchDispatches(octopus.apiKey, octopus.account),
-    settings,
+    [...dispatches, ...charge],
+    charge.length > 0
+      ? {
+          ...settings,
+          powerRate: happy.chargePowerRate,
+          stopSOC: happy.chargeStopSOC,
+        }
+      : settings,
   );
+  const happyHours = describeBlocks(charge);
   const isRecent =
     state.inverter_checked_at !== null &&
     Date.now() - state.inverter_checked_at.getTime() < RECHECK_MS;
   if (!force && isRecent && isKnownPlan(state, plan))
-    return { plan, reached: false, replaced: null, verified: false };
+    return {
+      plan,
+      happyHours,
+      reached: false,
+      replaced: null,
+      verified: false,
+    };
   return {
     plan,
+    happyHours,
     reached: true,
     ...(await applyToInverter(growatt, plan, force || !isRecent)),
   };
@@ -249,15 +316,17 @@ const checkCharge = async (
   userId: string,
   settings: Settings,
   state: AutomationStateRow,
+  octopus: LoadOctopus,
   trigger: AutomationTrigger,
   req: VercelRequest | null,
   deadline: number,
 ): Promise<{ outcome: AutomationOutcome; paused: boolean }> => {
   try {
-    const { plan, reached, replaced, verified } = await sync(
+    const { plan, happyHours, reached, replaced, verified } = await sync(
       userId,
       settings,
       state,
+      octopus,
       trigger === "check_now",
       deadline,
     );
@@ -286,6 +355,7 @@ const checkCharge = async (
           stopSOC: plan.stopSOC,
           slots: describePlan(plan),
           skipped: plan.skipped,
+          ...(happyHours !== "" && { happyHours }),
           ...diffPlan(replaced, describePlan(plan)),
         });
       // notify: "stopped working" was sent, so "working again" is too. A
@@ -469,23 +539,56 @@ const hasOneOff = async (userId: string) => {
   return rows.length > 0;
 };
 
+// True when the export running now is the one before a happy hour (it has
+// export times to put back) and that happy hour is no longer booked: cancelled
+// or moved. If the bookings can't be read, the export carries on.
+const isHappyHourGone = async (
+  state: AutomationStateRow,
+  octopus: LoadOctopus,
+) => {
+  const start = state.happy_export_for;
+  if (state.one_off_restore_slots === null || !start) return false;
+  const calls = await octopus();
+  if (!calls) return false;
+  try {
+    return !happyHourBlocks(await calls.bookings()).some(
+      (block) => block.start.getTime() === start.getTime(),
+    );
+  } catch {
+    // Automatic charging's check reports it.
+    return false;
+  }
+};
+
 // Export until battery %, once its slot has ended: turns the export times off
 // (keeping the power and stop), but only if the inverter still shows exactly
-// that slot; otherwise they were changed since, and are left alone. Once
+// that slot; otherwise they were changed since, and are left alone. For the
+// export before a happy hour, it puts the user's own export times back
+// instead (one_off_restore_*). Once
 // Growatt's nightly reset has passed, it has cleared them anyway. A failure is
 // tried again next check and logged once; a refused login isn't retried, so
 // the account can't get locked, and the reset clears the slot instead.
+// cancelled: stopped early because its happy hour is no longer booked; that
+// happy hour is forgotten too, so booking it again gets a new export.
 // paused: that login was refused, so nothing else should try it this check.
 const endOneOff = async (
   userId: string,
   state: AutomationStateRow,
   req: VercelRequest | null,
   deadline: number,
+  cancelled = false,
 ): Promise<{ result: AutomationResult; paused: boolean }> => {
-  const forget = (tx: Tx) => tx`
-    update private.automation_state
-    set one_off_until = null, one_off_slot = null, one_off_failed = false`;
+  const forget = async (tx: Tx) => {
+    await tx`
+      update private.automation_state
+      set one_off_until = null, one_off_slot = null, one_off_failed = false,
+        one_off_restore_power = null, one_off_restore_stop = null,
+        one_off_restore_slots = null, happy_export_target = null`;
+    if (cancelled)
+      await tx`update private.automation_state set happy_export_for = null`;
+  };
   const until = state.one_off_until;
+  const restore = state.one_off_restore_slots;
   const growatt = await loadGrowatt(userId, deadline);
   if (!until || !growatt || resetDay() >= ukDay(until)) {
     await withUser(userId, forget);
@@ -497,17 +600,37 @@ const endOneOff = async (
     const removed = await onInverter(async () => {
       const current = await client.fetchDischargePeriods(serial);
       if (describePeriods(current) !== state.one_off_slot) return false;
-      await client.setDischargePeriods(
-        serial,
-        String(current.powerRate),
-        String(current.stopSOC),
-        null,
-      );
+      if (restore !== null) {
+        const pick = (saved: number | null, found: number) =>
+          saved !== null && isPercent(saved) ? saved : found;
+        const plan = keptPlan(
+          pick(state.one_off_restore_power, current.powerRate),
+          pick(state.one_off_restore_stop, current.stopSOC),
+          restore,
+        );
+        await client.setDischargePeriods(
+          serial,
+          plan.powerRate,
+          plan.stopSOC,
+          ...plan.slots,
+        );
+      } else
+        await client.setDischargePeriods(
+          serial,
+          String(current.powerRate),
+          String(current.stopSOC),
+          null,
+        );
       return true;
     });
     await withUser(userId, async (tx) => {
       await forget(tx);
-      await audit(tx, req, userId, "one_off_ended", { ok: true, removed });
+      await audit(tx, req, userId, "one_off_ended", {
+        ok: true,
+        removed,
+        ...(removed && restore && { restored: restore }),
+        ...(cancelled && { cancelled: true }),
+      });
     });
     return { result: removed ? "applied" : "unchanged", paused: false };
   } catch (err) {
@@ -546,6 +669,7 @@ const runAutomaticExport = async (
   userId: string,
   settings: Settings,
   state: AutomationStateRow,
+  octopus: LoadOctopus,
   req: VercelRequest | null,
   deadline: number,
 ): Promise<{ result: AutomationResult; paused: boolean }> => {
@@ -574,8 +698,8 @@ const runAutomaticExport = async (
   try {
     if (state.one_off_until && state.one_off_until.getTime() > Date.now())
       return await skip("busy", { slot: state.one_off_slot });
-    const [octopus, growatt] = await Promise.all([
-      loadOctopus(userId),
+    const [calls, growatt] = await Promise.all([
+      octopus(),
       loadGrowatt(userId, deadline),
     ]);
     if (!growatt || batteryKwh === null || maxDischargeKw === null)
@@ -584,10 +708,8 @@ const runAutomaticExport = async (
         "Your Growatt or battery details are missing",
       );
     // Without Octopus there's no way to tell, so it exports anyway.
-    if (octopus) {
-      const dispatches = await fetchDispatches(octopus.apiKey, octopus.account);
-      if (isCarPluggedIn(dispatches)) return await skip("car_plugged_in");
-    }
+    if (calls && isCarPluggedIn(await calls.dispatches()))
+      return await skip("car_plugged_in");
     const { client, serial } = growatt;
     await logIn(client);
     const soc = await onInverter(() => client.fetchBatterySoc(serial));
@@ -674,6 +796,287 @@ const giveUpAutomaticExport = (
     });
   });
 
+// Settings → Happy hours export: before the next booked happy hour (on its
+// day, once it's close enough), exports the battery down to what the happy
+// hour can charge back, ending the minute before it starts. Skipped like
+// Automatic export: a one-off export is still running, the car is plugged in,
+// the battery is below the minimum, or the export would be too short. Every
+// run and skip goes in the audit log and marks that happy hour done. A
+// failure is logged once and tried again next check, until it's too late; a
+// refused login or missing details aren't retried. Once the slot ends,
+// endOneOff puts the user's own export times back, without any during the
+// happy hour. paused: that login was refused.
+const runHappyExport = async (
+  userId: string,
+  settings: Settings,
+  state: AutomationStateRow,
+  octopus: LoadOctopus,
+  req: VercelRequest | null,
+  deadline: number,
+): Promise<{ result: AutomationResult; paused: boolean }> => {
+  const unchanged = { result: "unchanged" as const, paused: false };
+  const happy = settings.happyHours;
+  const { batteryKwh, maxDischargeKw } = settings;
+  if (batteryKwh === null || maxDischargeKw === null) return unchanged;
+  const calls = await octopus();
+  if (!calls) return unchanged;
+  let block: HappyBlock | undefined;
+  try {
+    block = happyHourBlocks(await calls.bookings()).at(0);
+  } catch {
+    // Automatic charging's check reports it.
+    return unchanged;
+  }
+  // Only the next one, once the one before it has ended, and once each.
+  if (
+    !block ||
+    block.start.getTime() <= Date.now() ||
+    state.happy_export_for?.getTime() === block.start.getTime()
+  )
+    return unchanged;
+  const input: HappyExportInput = {
+    chargePowerRate: happy.chargePowerRate,
+    chargeStopSOC: happy.chargeStopSOC,
+    exportPowerRate: happy.exportPowerRate,
+    exportStopSOC: happy.exportStopSOC,
+    batteryKwh,
+    maxDischargeKw,
+  };
+  const status = happyExportStatus(block, input);
+  if (status === "wait") return unchanged;
+  const happyHour = `${toUkClock(block.start)}-${toUkClock(block.end)}`;
+  const start = block.start;
+  const markDone = (tx: Tx) => tx`
+    update private.automation_state set
+      happy_export_for = ${start}, happy_export_code = null`;
+  const log = (
+    tx: Tx,
+    result: AutomaticExportResult,
+    details: Record<string, string | number | boolean | null> = {},
+  ) =>
+    audit(tx, req, userId, "happy_export_run", {
+      result,
+      happyHour,
+      ...details,
+    });
+  const skip = async (
+    result: AutomaticExportResult,
+    details: Record<string, string | number | boolean | null> = {},
+  ) => {
+    await withUser(userId, async (tx) => {
+      await markDone(tx);
+      await log(tx, result, details);
+    });
+    return unchanged;
+  };
+  if (status === "late") return skip("too_late");
+  const target = exportTarget(input, block);
+  try {
+    if (state.one_off_until && state.one_off_until.getTime() > Date.now())
+      return await skip("busy", { slot: state.one_off_slot });
+    if (isCarPluggedIn(await calls.dispatches()))
+      return await skip("car_plugged_in");
+    const growatt = await loadGrowatt(userId, deadline);
+    if (!growatt)
+      throw new AutomationError(
+        "not_set_up",
+        "Your Growatt details are missing",
+      );
+    const { client, serial } = growatt;
+    await logIn(client);
+    const soc = await onInverter(() => client.fetchBatterySoc(serial));
+    if (soc < happy.exportMinSOC)
+      return await skip("low_battery", { soc, minSOC: happy.exportMinSOC });
+    const plan = planExportBefore(
+      {
+        soc,
+        powerRate: happy.exportPowerRate,
+        stopSOC: target,
+        batteryKwh,
+        maxDischargeKw,
+      },
+      block.start,
+    );
+    if (plan.kind === "already")
+      return await skip("already", { soc, stopSOC: target });
+    if (plan.kind === "tooLate") return await skip("too_late", { soc });
+    if (plan.minutes < MIN_EXPORT_MIN)
+      return await skip("too_short", { soc, minutes: plan.minutes });
+    const slot = { start: plan.start, end: plan.end };
+    const current = await onInverter(() =>
+      client.fetchDischargePeriods(serial),
+    );
+    const restore = slotsToRestore(describePeriods(current), block);
+    await onInverter(() =>
+      client.setDischargePeriods(
+        serial,
+        String(happy.exportPowerRate),
+        String(target),
+        toSlotParam(slot),
+      ),
+    );
+    await withUser(userId, async (tx) => {
+      // The check turns the slot off once it ends, putting these back.
+      await startOneOff(tx, userId, slot);
+      await tx`
+        update private.automation_state set
+          one_off_restore_power = ${current.powerRate},
+          one_off_restore_stop = ${current.stopSOC},
+          one_off_restore_slots = ${restore},
+          happy_export_target = ${target}`;
+      await markDone(tx);
+      await log(tx, "exported", {
+        soc,
+        slot: `${slot.start}-${slot.end}`,
+        powerRate: happy.exportPowerRate,
+        stopSOC: target,
+        capped: plan.capped,
+      });
+    });
+    return { result: "applied", paused: false };
+  } catch (err) {
+    const failure =
+      err instanceof AutomationError
+        ? err
+        : new AutomationError("internal", "Something went wrong on our side");
+    console.error(
+      `happy hour export failed for ${userId.slice(0, 8)}:`,
+      failure.code,
+    );
+    const giveUp = failure.pause || failure.code === "not_set_up";
+    await withUser(userId, async (tx) => {
+      if (giveUp) await markDone(tx);
+      else if (state.happy_export_code !== failure.code)
+        await tx`
+          update private.automation_state
+          set happy_export_code = ${failure.code}`;
+      else return;
+      await log(tx, "failed", {
+        code: failure.code,
+        message: failure.message,
+        paused: failure.pause,
+        retrying: !giveUp,
+      });
+    });
+    return { result: "failed", paused: failure.pause };
+  }
+};
+
+// While the export before a happy hour runs: if part of that happy hour was
+// cancelled (back-to-back bookings, one of them gone), it can charge back
+// less, so the export's stop level goes up to match. Growatt stops exporting
+// there by itself, even if the battery is already below it. If the export
+// times were changed since, they're left alone. A failure is tried again
+// next check and logged once. paused: that login was refused.
+const raiseHappyExportStop = async (
+  userId: string,
+  settings: Settings,
+  state: AutomationStateRow,
+  octopus: LoadOctopus,
+  req: VercelRequest | null,
+  deadline: number,
+): Promise<{ result: AutomationResult; paused: boolean }> => {
+  const unchanged = { result: "unchanged" as const, paused: false };
+  const start = state.happy_export_for;
+  const was = state.happy_export_target;
+  const slot = state.one_off_slot;
+  const { batteryKwh, maxDischargeKw, happyHours: happy } = settings;
+  if (
+    !start ||
+    was === null ||
+    slot === null ||
+    batteryKwh === null ||
+    maxDischargeKw === null
+  )
+    return unchanged;
+  const calls = await octopus();
+  if (!calls) return unchanged;
+  let block: HappyBlock | undefined;
+  try {
+    block = happyHourBlocks(await calls.bookings()).find(
+      (b) => b.start.getTime() === start.getTime(),
+    );
+  } catch {
+    // Automatic charging's check reports it.
+    return unchanged;
+  }
+  // Gone altogether: isHappyHourGone stops the export instead.
+  if (!block) return unchanged;
+  const target = exportTarget(
+    {
+      chargePowerRate: happy.chargePowerRate,
+      chargeStopSOC: happy.chargeStopSOC,
+      exportPowerRate: happy.exportPowerRate,
+      exportStopSOC: happy.exportStopSOC,
+      batteryKwh,
+      maxDischargeKw,
+    },
+    block,
+  );
+  if (target <= was) return unchanged;
+  const happyHour = `${toUkClock(block.start)}-${toUkClock(block.end)}`;
+  try {
+    const growatt = await loadGrowatt(userId, deadline);
+    if (!growatt) return unchanged;
+    const { client, serial } = growatt;
+    await logIn(client);
+    const raised = await onInverter(async () => {
+      const current = await client.fetchDischargePeriods(serial);
+      if (describePeriods(current) !== slot) return false;
+      const plan = keptPlan(current.powerRate, target, slot);
+      await client.setDischargePeriods(
+        serial,
+        plan.powerRate,
+        plan.stopSOC,
+        ...plan.slots,
+      );
+      return true;
+    });
+    await withUser(userId, async (tx) => {
+      // Not raised: the times were changed, so stop checking this one.
+      await tx`
+        update private.automation_state set
+          happy_export_target = ${target}, happy_export_code = null`;
+      if (raised)
+        await audit(tx, req, userId, "happy_export_run", {
+          result: "shortened",
+          happyHour,
+          stopSOC: target,
+          previousStopSOC: was,
+        });
+    });
+    return raised ? { result: "applied", paused: false } : unchanged;
+  } catch (err) {
+    const failure =
+      err instanceof AutomationError
+        ? err
+        : new AutomationError("internal", "Something went wrong on our side");
+    console.error(
+      `happy hour export raise failed for ${userId.slice(0, 8)}:`,
+      failure.code,
+    );
+    await withUser(userId, async (tx) => {
+      // A refused login isn't tried again, so the account can't get locked.
+      if (failure.pause)
+        await tx`
+          update private.automation_state set happy_export_target = ${target}`;
+      if (state.happy_export_code === failure.code) return;
+      await tx`
+        update private.automation_state
+        set happy_export_code = ${failure.code}`;
+      await audit(tx, req, userId, "happy_export_run", {
+        result: "failed",
+        happyHour,
+        code: failure.code,
+        message: failure.message,
+        paused: failure.pause,
+        retrying: !failure.pause,
+      });
+    });
+    return { result: "failed", paused: failure.pause };
+  }
+};
+
 // Last night's charging, for the activity log and the morning notification:
 // the battery level now (null if it couldn't be read), the user's window, the
 // other times the battery was set to charge since 18:00 yesterday
@@ -756,8 +1159,9 @@ const writeChargingSummary = async (
   });
 };
 
-// Runs whichever of automatic charging, Export every day and Automatic export
-// the user has on, and turns off an ended Export until battery % slot, holding
+// Runs whichever of automatic charging (with happy hours), the export before
+// a happy hour, Export every day and Automatic export the user has on, and
+// turns off an ended Export until battery % slot, holding
 // the lease so only one check talks to their inverter at a time.
 const check = async (
   userId: string,
@@ -766,7 +1170,8 @@ const check = async (
   deadline: number,
 ): Promise<AutomationOutcome> => {
   const settings = await withUser(userId, readSettings);
-  const { automationEnabled, exportEveryDay, automaticExport } = settings;
+  const { automationEnabled, exportEveryDay, automaticExport, happyHours } =
+    settings;
   // A one-off is only turned off, and Automatic export only run, by the
   // schedule: Sync now's reply is about automatic charging.
   const scheduled = trigger === "schedule";
@@ -788,18 +1193,39 @@ const check = async (
     if (state.paused && trigger === "schedule")
       return { result: "paused", plan: null };
 
+    // Loaded when a part first needs Octopus, then shared.
+    const octopus = once(async () => {
+      const saved = await loadOctopus(userId);
+      return saved && octopusCalls(saved.apiKey, saved.account);
+    });
     let outcome: AutomationOutcome = { result: "unchanged", plan: null };
     // One inverter write per check (each takes 20–30s of the function's 60),
     // and no second go at a login that was just refused.
     let canWrite = true;
-    if (
+    const oneOffEnded =
       scheduled &&
-      state.one_off_until &&
-      state.one_off_until.getTime() <= Date.now()
-    ) {
-      const ended = await endOneOff(userId, state, req, deadline);
+      state.one_off_until !== null &&
+      state.one_off_until.getTime() <= Date.now();
+    const cancelled =
+      scheduled &&
+      !oneOffEnded &&
+      state.one_off_until !== null &&
+      (await isHappyHourGone(state, octopus));
+    if (oneOffEnded || cancelled) {
+      const ended = await endOneOff(userId, state, req, deadline, cancelled);
       outcome = { result: ended.result, plan: null };
       canWrite = ended.result !== "applied" && !ended.paused;
+    } else if (scheduled && state.one_off_until !== null) {
+      // Still running: part of its happy hour may have been cancelled.
+      const raised = await raiseHappyExportStop(
+        userId,
+        settings,
+        state,
+        octopus,
+        req,
+        deadline,
+      );
+      canWrite = raised.result !== "applied" && !raised.paused;
     }
     if (
       exportStatus !== "wait" &&
@@ -812,6 +1238,7 @@ const check = async (
           userId,
           settings,
           state,
+          octopus,
           req,
           deadline,
         );
@@ -819,12 +1246,30 @@ const check = async (
         canWrite = run.result !== "applied" && !run.paused;
       }
     }
+    if (
+      scheduled &&
+      automationEnabled &&
+      happyHours.chargeEnabled &&
+      happyHours.exportEnabled &&
+      canWrite
+    ) {
+      const run = await runHappyExport(
+        userId,
+        settings,
+        state,
+        octopus,
+        req,
+        deadline,
+      );
+      canWrite = run.result !== "applied" && !run.paused;
+    }
     let canRestore = canWrite;
     if (automationEnabled && canWrite) {
       const charge = await checkCharge(
         userId,
         settings,
         state,
+        octopus,
         trigger,
         req,
         deadline,
@@ -861,8 +1306,9 @@ const check = async (
 
 // One automation check for one user: asks Octopus for their slots, works out
 // the charge plan, and sets the inverter if it differs; after Growatt's
-// 23:30 reset, puts their export times back; and in the evening starts
-// Automatic export. The scheduled check
+// 23:30 reset, puts their export times back; in the evening starts
+// Automatic export; and before a booked happy hour, exports what it can
+// charge back. The scheduled check
 // skips paused users and trusts what it last saw on the inverter for up to 3
 // hours; Sync now always reads the inverter. req: the user's request, for the
 // audit log's IP (null for the schedule). Never throws.

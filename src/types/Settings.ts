@@ -80,6 +80,20 @@ type BatteryDraft = { batteryKwh: string; maxDischargeKw: string };
 
 type BatteryFormProps = { saved: Settings };
 
+// hasBattery: the battery details are saved, which the export needs.
+type HappyHoursFormProps = { saved: Settings; hasBattery: boolean };
+
+// A switch inside the happy hours form, saved with the form. hint is read
+// out with it.
+type HappyHoursToggleProps = {
+  id: string;
+  label: string;
+  hint: string;
+  isOn: boolean;
+  isDisabled: boolean;
+  onChange: (isOn: boolean) => void;
+};
+
 export type {
   MfaSetupProps,
   MfaTurnOffProps,
@@ -98,4 +112,6 @@ export type {
   AutomaticExportFormProps,
   BatteryDraft,
   BatteryFormProps,
+  HappyHoursFormProps,
+  HappyHoursToggleProps,
 };

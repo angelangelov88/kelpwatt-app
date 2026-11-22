@@ -50,7 +50,9 @@ const categoryOf = ({
           field(details, "notify") === true)
         ? "failures"
         : undefined;
+    // The export before a happy hour, like Automatic export.
     case "automatic_export_run":
+    case "happy_export_run":
       return result === "failed" ? "failures" : "automaticExport";
     case "one_off_ended":
       return ok === false ? "failures" : "exports";

@@ -61,13 +61,17 @@ const startOneOff = (tx: Tx, userId: string, { start, end }: Slot) => tx`
   on conflict (user_id) do update set
     one_off_until = excluded.one_off_until,
     one_off_slot = excluded.one_off_slot, one_off_failed = false,
+    one_off_restore_power = null, one_off_restore_stop = null,
+    one_off_restore_slots = null, happy_export_target = null,
     export_restored_on =
       coalesce(s.export_restored_on, excluded.export_restored_on)`;
 
 // Other export times were applied, so there's no one-off to turn off.
 const forgetOneOff = (tx: Tx) =>
   tx`update private.automation_state
-    set one_off_until = null, one_off_slot = null, one_off_failed = false`;
+    set one_off_until = null, one_off_slot = null, one_off_failed = false,
+      one_off_restore_power = null, one_off_restore_stop = null,
+      one_off_restore_slots = null, happy_export_target = null`;
 
 const toSlotParam = ({ start, end }: Slot) => ({
   startHour: start.slice(0, 2),
