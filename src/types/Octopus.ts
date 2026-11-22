@@ -85,9 +85,102 @@ type RawSavingSessions = {
   } | null;
 };
 
+// Whether a happy hour still has places, as Octopus reports it.
+type HappyHourCapacity = "AVAILABLE" | "LOW" | "FULL";
+
+// An Octopus weekend happy hour (eventType WEEKEND_HAPPY_HOUR). Booking one
+// costs tokens.
+type HappyHour = {
+  id: string;
+  code: string;
+  startAt: Date;
+  endAt: Date;
+  // null when Octopus doesn't say.
+  tokenCost: number | null;
+  capacity: HappyHourCapacity | null;
+  // Empty means every region.
+  regions: number[];
+  booked: boolean;
+};
+
+// A happy hour you booked, from Octopus's joined events. energyUsedKwh and
+// creditPence are null until Octopus sets the results.
+type HappyHourBooking = {
+  id: string;
+  startAt: Date;
+  endAt: Date;
+  energyUsedKwh: number | null;
+  creditPence: number | null;
+};
+
+type HappyHoursData = {
+  region: number | null;
+  // null when Octopus doesn't say.
+  tokenBalance: number | null;
+  // Every happy hour Octopus currently lists, with your booked status.
+  events: HappyHour[];
+  // Every happy hour you booked, including ones no longer listed.
+  bookings: HappyHourBooking[];
+  // false when Octopus sent no account data, so bookings is empty only
+  // because it's unknown, not because nothing is booked.
+  bookingsKnown: boolean;
+};
+
+type RawHappyHours = {
+  savingSessions: {
+    events:
+      | (RawEvent & {
+          tokenCost: number | null;
+          capacityStatus: string | null;
+        })[]
+      | null;
+    account: {
+      signedUpMeterPoint: { regionId: number } | null;
+      tokenBalance: number | null;
+      joinedEvents:
+        | {
+            eventId: string | number;
+            eventType: string;
+            startAt: string;
+            endAt: string;
+            energyUsedInKwh: number | null;
+            rewardGivenInPence: number | null;
+          }[]
+        | null;
+    } | null;
+  } | null;
+};
+
+// Booked happy hours that touch or overlap, joined into one stretch.
+type HappyBlock = { start: Date; end: Date };
+
+// Whether the export before a happy hour should start: due (read the battery
+// now), late (too close to the happy hour to be worth it), or wait.
+type HappyExportStatus = "due" | "late" | "wait";
+
+// The settings and battery details the export before a happy hour uses.
+type HappyExportInput = {
+  chargePowerRate: number;
+  chargeStopSOC: number;
+  exportPowerRate: number;
+  exportStopSOC: number;
+  batteryKwh: number;
+  maxDischargeKw: number;
+};
+
 type SessionStatus = "upcoming" | "in progress" | "ended";
 
 type HistoryDays = 7 | 30 | 365;
+
+// The History heading with its on/off switch and day buttons, shared by the
+// Power Down and Happy Hours cards. label names the switch for screen readers.
+type HistoryControlsProps = {
+  label: string;
+  showHistory: boolean;
+  onToggle: () => void;
+  days: HistoryDays;
+  onDaysChange: (days: HistoryDays) => void;
+};
 
 type PowerDownSessionsProps = {
   // Adds the session window to Grid First with High Export settings.
@@ -110,6 +203,9 @@ type SectionHeadingProps = { children: string };
 
 export type {
   Dispatch,
+  HappyBlock,
+  HappyExportStatus,
+  HappyExportInput,
   Slots,
   ChargeSettings,
   ChargePlan,
@@ -122,8 +218,14 @@ export type {
   RawEvent,
   RawJoined,
   RawSavingSessions,
+  HappyHourCapacity,
+  HappyHour,
+  HappyHourBooking,
+  HappyHoursData,
+  RawHappyHours,
   SessionStatus,
   HistoryDays,
+  HistoryControlsProps,
   PowerDownSessionsProps,
   OctopusProps,
   CheckNowProps,

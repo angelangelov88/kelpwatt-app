@@ -131,7 +131,10 @@ const joinedInLastDays = (
     .sort(byStartDesc);
 };
 
-const sessionStatus = (s: PowerDownSession, now = new Date()): SessionStatus =>
+const sessionStatus = (
+  s: Pick<PowerDownSession, "startAt" | "endAt">,
+  now = new Date(),
+): SessionStatus =>
   now < s.startAt ? "upcoming" : now < s.endAt ? "in progress" : "ended";
 
 const pad = (n: number) => String(n).padStart(2, "0");

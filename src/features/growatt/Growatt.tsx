@@ -13,6 +13,8 @@ import useExportPresets from "./useExportPresets";
 import useToast from "../../contexts/useToast";
 import PowerDownSessions from "../octopus/PowerDownSessions";
 import useSavingSessions from "../octopus/useSavingSessions";
+import HappyHours from "../octopus/HappyHours";
+import useHappyHours from "../octopus/useHappyHours";
 import { sessionToSlot } from "../../lib/savingSessions";
 
 // A slot as [start, end) minutes, with end past midnight (above 1440) if it wraps.
@@ -50,6 +52,7 @@ const Growatt = ({ showSessions }: GrowattProps) => {
   const dischargeReader = useInverterRead(dischargePeriodsQuery, dischargeForm);
   // Same query as the Power Down card, so refetching here updates the card.
   const sessionsQuery = useSavingSessions();
+  const happyHoursQuery = useHappyHours();
 
   const { showToast } = useToast();
   const { high } = useExportPresets();
@@ -120,11 +123,12 @@ const Growatt = ({ showSessions }: GrowattProps) => {
     dischargeReader.isReading ||
     setChargePeriodsMutation.isPending ||
     setDischargeMutation.isPending ||
-    sessionsQuery.isFetching;
+    sessionsQuery.isFetching ||
+    happyHoursQuery.isFetching;
 
   // Both inverter reads go through the queue in useGrowatt, so they run one after the
-  // other. The Power Down sessions come from Octopus, so they load alongside them;
-  // the card toasts any error.
+  // other. The Power Down sessions and happy hours come from Octopus, so they load
+  // alongside them; each card toasts its own error.
   const readAll = () => {
     if (
       (chargeReader.hasUnsavedChanges || dischargeReader.hasUnsavedChanges) &&
@@ -135,7 +139,10 @@ const Growatt = ({ showSessions }: GrowattProps) => {
       return;
     chargeReader.read({ confirmed: true });
     dischargeReader.read({ confirmed: true });
-    if (showSessions) void sessionsQuery.refetch({ cancelRefetch: false });
+    if (showSessions) {
+      void sessionsQuery.refetch({ cancelRefetch: false });
+      void happyHoursQuery.refetch({ cancelRefetch: false });
+    }
   };
 
   return (
@@ -147,8 +154,10 @@ const Growatt = ({ showSessions }: GrowattProps) => {
             <p>
               <b>Load all</b> gets the current settings from your inverter for
               all the cards below
-              {showSessions ? ", and today's Power Down sessions" : ""}. Nothing
-              is changed.
+              {showSessions
+                ? ", and today's Power Down sessions and upcoming happy hours"
+                : ""}
+              . Nothing is changed.
             </p>
           </InfoTip>
         </div>
@@ -173,6 +182,7 @@ const Growatt = ({ showSessions }: GrowattProps) => {
           }
         />
       )}
+      {showSessions && <HappyHours />}
       <div ref={gridFirstRef} className="scroll-mt-4">
         <GridFirstCard
           form={dischargeForm}

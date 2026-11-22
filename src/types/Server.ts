@@ -1,7 +1,7 @@
 import type postgres from "postgres";
 import type { JwtPayload, SupabaseClient } from "@supabase/supabase-js";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import type { ChargePlan } from "./Octopus";
+import type { ChargePlan, Dispatch, HappyHourBooking } from "./Octopus";
 
 // Types for the Vercel functions in api/. Server-only: never imported by the app.
 
@@ -53,6 +53,8 @@ type AuditAction =
   | "settings_saved"
   | "growatt_write"
   | "octopus_join"
+  | "octopus_book_happy_hour"
+  | "octopus_cancel_happy_hour"
   | "automation_run"
   | "signed_in"
   | "export_presets_saved"
@@ -62,7 +64,9 @@ type AuditAction =
   | "one_off_ended"
   | "automatic_export_saved"
   | "automatic_export_run"
-  | "charging_summary";
+  | "charging_summary"
+  | "happy_hours_saved"
+  | "happy_export_run";
 
 // Which call of a credentials check went wrong: Growatt's login or the
 // inverter read with the serial, Octopus's API key or the account number.
@@ -95,6 +99,7 @@ type AutomaticExportResult =
   | "already"
   | "too_late"
   | "too_short"
+  | "shortened"
   | "failed";
 
 // What an automation check did for one user. skipped: automation is off.
@@ -147,7 +152,35 @@ type AutomationStateRow = {
   // the last one worked), and whether a notification was sent for it.
   failing_since: Date | null;
   failure_notified: boolean;
+  // Settings → Happy hours export: the start of the happy hour it last ran,
+  // was skipped or given up for; and the code of the last failure logged for
+  // it, null if none.
+  happy_export_for: Date | null;
+  happy_export_code: string | null;
+  // The battery level the running export before a happy hour stops at, null
+  // when none is running.
+  happy_export_target: number | null;
+  // The booked happy hours last loaded ("start/end, …", ISO), kept for when
+  // a check can't load them; and why that last failed, null if it worked.
+  happy_bookings: string | null;
+  happy_charge_code: string | null;
+  // The export times to put back when the one-off slot ends (as
+  // describePeriods writes them), null to just turn it off.
+  one_off_restore_power: number | null;
+  one_off_restore_stop: number | null;
+  one_off_restore_slots: string | null;
 };
+
+// The user's Octopus calls for one automation check, each made at most once
+// however many of its parts need them. bookings: the happy hours booked.
+type OctopusCalls = {
+  dispatches: () => Promise<Dispatch[]>;
+  bookings: () => Promise<HappyHourBooking[]>;
+};
+
+// Loads them the first time a part needs Octopus; null when the user has no
+// Octopus details.
+type LoadOctopus = () => Promise<OctopusCalls | null>;
 
 // The /api/cron/update reply. Counts only: GitHub Actions logs are public.
 type CronSummary = { users: number } & Record<AutomationResult, number>;
@@ -197,6 +230,8 @@ export type {
   AutomationTrigger,
   AutomationStateRow,
   CronSummary,
+  OctopusCalls,
+  LoadOctopus,
   PushRow,
   PushSubscriptionRow,
   CronNotifySummary,

@@ -48,7 +48,9 @@ const PrivacyPage = () => (
           window and whether it&apos;s used, charge power, battery stop level
           and whether automatic charging is on, your Automatic export settings
           (whether it&apos;s on, its time, discharge rate, stop level and
-          minimum battery level), the theme you chose (light, dark or your
+          minimum battery level), your happy hour settings (whether to charge
+          during and export before the happy hours you book, with their rates
+          and battery levels), the theme you chose (light, dark or your
           device&apos;s setting), and which kinds of notification you want.
         </li>
         <li>
@@ -67,7 +69,14 @@ const PrivacyPage = () => (
           changed, and why the last check failed, if it did. We keep these so we
           only change your inverter when your plan changes. If you turn
           Automatic export on, the last day it ran and why tonight&apos;s last
-          try failed, if it did, so it runs at most once an evening.
+          try failed, if it did, so it runs at most once an evening. If you
+          export before happy hours, the last happy hour it ran for and why its
+          last try failed, if it did, the battery level the export stops at, and
+          the export times to put back on your inverter afterwards. If you
+          charge during happy hours, the times of the ones you booked that
+          haven&apos;t ended yet, as last loaded from Octopus, so charging
+          carries on if Octopus doesn&apos;t answer, and why loading them last
+          failed, if it did.
         </li>
         <li>
           <strong className="text-gray-100">An activity log:</strong> a record
@@ -76,13 +85,14 @@ const PrivacyPage = () => (
           link), changing your password, turning two-step verification on or
           off, saving, removing or failing to verify your Growatt or Octopus
           details, saving settings, changes sent to your inverter, saving
-          sessions you join, automatic charging checks that changed your
-          inverter, started failing or started working again, each
-          evening&apos;s Automatic export (when it started or why it was
-          skipped, with your battery level at the time), and downloads of your
-          data, and a summary of each night&apos;s automatic charging with your
-          battery level the next morning. It never contains passwords or keys.
-          You can read it on the Activity page.
+          sessions you join, happy hours you book or cancel, automatic charging
+          checks that changed your inverter, started failing or started working
+          again, each evening&apos;s Automatic export (when it started or why it
+          was skipped, with your battery level at the time), each export before
+          a happy hour (the same), and downloads of your data, and a summary of
+          each night&apos;s automatic charging with your battery level the next
+          morning. It never contains passwords or keys. You can read it on the
+          Activity page.
         </li>
         <li>
           <strong className="text-gray-100">Messages you send us:</strong> if
@@ -100,10 +110,12 @@ const PrivacyPage = () => (
       <p>
         To show your dashboard and plan charging, the app also fetches your
         inverter&apos;s charge settings from Growatt and your planned charging
-        times and saving sessions from Octopus. With automatic charging on, it
-        fetches your planned charging times every 5 minutes. These are fetched
-        when needed and not stored, apart from what the activity log and the
-        automatic charging status record.
+        times, saving sessions, happy hours (including the electricity you used
+        and any credit for ones you booked) and token balance from Octopus. With
+        automatic charging on, it fetches your planned charging times every 5
+        minutes, and with charging during happy hours on, the happy hours you
+        booked too. These are fetched when needed and not stored, apart from
+        what the activity log and the automatic charging status record.
       </p>
     </LegalSection>
 
@@ -177,8 +189,9 @@ const PrivacyPage = () => (
         </li>
         <li>
           <strong className="text-gray-100">Octopus Energy</strong>: we use your
-          API key to read your planned charging times and saving sessions, and
-          to join a session when you ask.
+          API key to read your planned charging times, saving sessions, happy
+          hours and token balance, and to join a session or book or cancel a
+          happy hour when you ask.
         </li>
         <li>
           <strong className="text-gray-100">

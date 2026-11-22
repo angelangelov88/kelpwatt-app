@@ -108,12 +108,14 @@ const describeAutomation = (details: unknown): ActivityDescription => {
         added && `added ${formatSlots(added)}`,
       ].filter((c): c is string => typeof c === "string");
       const slots = formatSlots(text(details, "slots"));
+      const happyHours = text(details, "happyHours");
       return {
         title: "Automatic charging updated your inverter",
         detail: join([
           trigger,
           ...changes,
           changes.length > 0 ? `now ${slots}` : slots,
+          happyHours && `happy hour ${formatSlots(happyHours)}`,
           ...powerAndStop(details),
           skipped > 0 &&
             `${String(skipped)} Octopus slot${skipped === 1 ? "" : "s"} didn't fit`,
@@ -145,6 +147,17 @@ const describeAutomation = (details: unknown): ActivityDescription => {
         title: "Automatic charging is working again",
         detail: trigger,
         failed: false,
+      };
+    // Charging carried on with the happy hours last loaded.
+    case "happy_hours_failed":
+      return {
+        title: "Couldn't load your happy hours",
+        detail: join([
+          trigger,
+          text(details, "message"),
+          "Charging during the happy hours last loaded",
+        ]),
+        failed: true,
       };
     default:
       return { title: "Automatic charging ran", failed: false };
@@ -213,6 +226,91 @@ const describeAutomaticExport = (details: unknown): ActivityDescription => {
       };
     default:
       return { title: "Automatic export ran", failed: false };
+  }
+};
+
+// What the export before a happy hour did: started, skipped (and why) or
+// failed.
+const describeHappyExport = (details: unknown): ActivityDescription => {
+  const happyHour = text(details, "happyHour");
+  const before = happyHour && `Before the ${formatSlots(happyHour)} happy hour`;
+  const soc = number(details, "soc");
+  const skipped = (reason: string | undefined) => ({
+    title: "Happy hour export skipped",
+    detail: join([before, reason]),
+    failed: false,
+  });
+  switch (text(details, "result")) {
+    case "exported":
+      return {
+        title: "Happy hour export set",
+        detail: join([
+          before,
+          formatSlots(text(details, "slot"), "no export times"),
+          soc !== undefined && `from ${String(soc)}%`,
+          ...powerAndStop(details),
+          flag(details, "capped") &&
+            "started late, so it may not get down to the stop level",
+        ]),
+        failed: false,
+      };
+    case "shortened": {
+      const was = number(details, "previousStopSOC");
+      const now = number(details, "stopSOC");
+      return {
+        title: "Happy hour export shortened",
+        detail: join([
+          happyHour &&
+            `Part of the happy hour was cancelled, leaving ${formatSlots(happyHour)}`,
+          now !== undefined &&
+            (was !== undefined
+              ? `now stops at ${String(now)}% instead of ${String(was)}%`
+              : `now stops at ${String(now)}%`),
+        ]),
+        failed: false,
+      };
+    }
+    case "car_plugged_in":
+      return skipped("Your car was plugged in");
+    case "busy":
+      return skipped("An Export until battery % was already running");
+    case "low_battery": {
+      const min = number(details, "minSOC");
+      return skipped(
+        soc !== undefined && min !== undefined
+          ? `The battery was at ${String(soc)}%, below your ${String(min)}% minimum`
+          : "The battery was below your minimum",
+      );
+    }
+    case "already":
+      return skipped(
+        soc !== undefined
+          ? `The battery was already at ${String(soc)}%, low enough to fill up during it`
+          : "The battery was already low enough to fill up during it",
+      );
+    case "too_late":
+      return skipped("No check got to it in time before the happy hour");
+    case "too_short": {
+      const minutes = number(details, "minutes");
+      return skipped(
+        minutes !== undefined
+          ? `It would only have lasted ${String(minutes)} minute${minutes === 1 ? "" : "s"}`
+          : "It would have been too short",
+      );
+    }
+    case "failed":
+      return {
+        title: "Happy hour export didn't run",
+        detail: join([
+          before,
+          text(details, "message"),
+          flag(details, "retrying") && "Trying again at the next check",
+          flag(details, "paused") && "Update your saved login in Settings",
+        ]),
+        failed: true,
+      };
+    default:
+      return { title: "Happy hour export ran", failed: false };
   }
 };
 
@@ -394,6 +492,29 @@ const describeActivity = ({
         failed: !ok,
       };
     }
+    case "octopus_book_happy_hour": {
+      const ok = flag(details, "ok") ?? true;
+      return {
+        title: ok ? "Booked a happy hour" : "Couldn't book a happy hour",
+        failed: !ok,
+      };
+    }
+    case "octopus_cancel_happy_hour": {
+      const ok = flag(details, "ok") ?? true;
+      const confirmed = flag(details, "confirmed");
+      return {
+        title: ok
+          ? "Cancelled a happy hour booking"
+          : "Couldn't cancel a happy hour booking",
+        detail:
+          ok && confirmed === false
+            ? "Octopus accepted it, but Kelpwatt couldn't check it afterwards"
+            : !ok && confirmed === false
+              ? "Octopus accepted it, but still showed it as booked afterwards"
+              : undefined,
+        failed: !ok,
+      };
+    }
     case "export_presets_saved":
       return {
         title: "Export to grid presets saved",
@@ -431,13 +552,28 @@ const describeActivity = ({
             detail: text(details, "message"),
             failed: true,
           }
-        : {
-            title: "Export until battery % finished",
-            detail: flag(details, "removed")
-              ? "Export times turned off"
-              : "The export times had already changed, so they were left alone",
-            failed: false,
-          };
+        : flag(details, "cancelled")
+          ? {
+              title: "Happy hour export stopped",
+              detail: join([
+                "The happy hour is no longer booked",
+                !flag(details, "removed")
+                  ? "The export times had already changed, so they were left alone"
+                  : text(details, "restored")
+                    ? `Your export times are back: ${formatSlots(text(details, "restored"))}`
+                    : "Export times turned off",
+              ]),
+              failed: false,
+            }
+          : {
+              title: "Export until battery % finished",
+              detail: !flag(details, "removed")
+                ? "The export times had already changed, so they were left alone"
+                : text(details, "restored")
+                  ? `Your export times are back: ${formatSlots(text(details, "restored"))}`
+                  : "Export times turned off",
+              failed: false,
+            };
     case "automatic_export_saved": {
       const at = text(details, "at");
       const min = number(details, "minSOC");
@@ -455,6 +591,41 @@ const describeActivity = ({
     // The 5-minute check, at the time chosen for Automatic export.
     case "automatic_export_run":
       return describeAutomaticExport(details);
+    case "happy_hours_saved": {
+      const charge = flag(details, "chargeEnabled");
+      const exporting = flag(details, "exportEnabled");
+      // e.g. "power 100%", or nothing when the entry doesn't have it.
+      const percent = (key: string, label: string) => {
+        const n = number(details, key);
+        return n !== undefined && `${label} ${String(n)}%`;
+      };
+      return {
+        title: "Happy hour settings saved",
+        detail: join([
+          charge !== undefined &&
+            (charge
+              ? join([
+                  "Charging on",
+                  percent("chargePowerRate", "power"),
+                  percent("chargeStopSOC", "up to"),
+                ])
+              : "Charging off"),
+          exporting !== undefined &&
+            (exporting
+              ? join([
+                  "Export before on",
+                  percent("exportPowerRate", "power"),
+                  percent("exportStopSOC", "never below"),
+                  percent("exportMinSOC", "only from"),
+                ])
+              : "Export before off"),
+        ]),
+        failed: false,
+      };
+    }
+    // The 5-minute check, before a booked happy hour.
+    case "happy_export_run":
+      return describeHappyExport(details);
     case "automation_run":
       return describeAutomation(details);
     // The first scheduled check after 07:00, with automatic charging on.

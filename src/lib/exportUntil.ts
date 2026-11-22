@@ -19,13 +19,25 @@ const pad = (n: number) => String(n).padStart(2, "0");
 const toTime = (minutes: number) =>
   `${pad(Math.floor(minutes / 60))}:${pad(minutes % 60)}`;
 
-const planExportUntil = (
-  { soc, powerRate, stopSOC, batteryKwh, maxDischargeKw }: ExportUntilInput,
-  now = new Date(),
-): ExportUntilPlan => {
+// How many whole minutes it takes to export down to MARGIN % above stopSOC.
+const exportMinutes = ({
+  soc,
+  powerRate,
+  stopSOC,
+  batteryKwh,
+  maxDischargeKw,
+}: ExportUntilInput) => {
   const energyKwh = ((soc - (stopSOC + MARGIN)) / 100) * batteryKwh;
   const powerKw = (powerRate / 100) * maxDischargeKw;
-  const minutes = Math.floor((energyKwh / powerKw) * 60);
+  return Math.floor((energyKwh / powerKw) * 60);
+};
+
+const planExportUntil = (
+  input: ExportUntilInput,
+  now = new Date(),
+): ExportUntilPlan => {
+  const { soc } = input;
+  const minutes = exportMinutes(input);
   if (!(minutes >= 1)) return { kind: "already", soc };
   const start = toUkMinutes(now);
   const end = Math.min(start + minutes, LAST_END);
@@ -40,4 +52,29 @@ const planExportUntil = (
   };
 };
 
-export { MARGIN, planExportUntil };
+// The same export, but timed to end the minute before `before` (later today,
+// UK): it starts as late as it can, or now if there isn't enough time left
+// (capped).
+const planExportBefore = (
+  input: ExportUntilInput,
+  before: Date,
+  now = new Date(),
+): ExportUntilPlan => {
+  const { soc } = input;
+  const minutes = exportMinutes(input);
+  if (!(minutes >= 1)) return { kind: "already", soc };
+  const nowMinutes = toUkMinutes(now);
+  const end = Math.min(toUkMinutes(before) - 1, LAST_END);
+  if (end <= nowMinutes) return { kind: "tooLate", soc };
+  const start = Math.max(nowMinutes, end - minutes);
+  return {
+    kind: "export",
+    soc,
+    start: toTime(start),
+    end: toTime(end),
+    minutes: end - start,
+    capped: end - start < minutes,
+  };
+};
+
+export { MARGIN, exportMinutes, planExportUntil, planExportBefore };

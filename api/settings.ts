@@ -6,6 +6,7 @@ import {
   batterySchema,
   dailyExportSchema,
   exportPresetsSchema,
+  happyHoursSchema,
   notificationsSchema,
   settingsSchema,
   themeSchema,
@@ -40,6 +41,10 @@ const presetDetails = ({ high, low }: ExportPresets) =>
 // PUT ?part=automatic AutomaticExport → Settings. Export until battery %
 //   every evening; on needs Growatt and Octopus credentials and the battery
 //   details. Leaves everything else alone.
+// PUT ?part=happy HappyHourSettings → Settings. Charging during, and
+//   exporting before, booked happy hours; charging on needs automatic
+//   charging on, exporting on needs the battery details too. Leaves
+//   everything else alone.
 // PUT ?part=battery BatteryInfo → Settings. Battery size and max discharge
 //   power, for Export until battery %. Leaves everything else alone.
 // PUT ?part=theme ThemeSetting → Settings. Light, dark or the device's
@@ -293,6 +298,74 @@ const handler = async (req: VercelRequest, res: VercelResponse) => {
         409,
         "setup_missing",
         "Save your Growatt details and your battery details before turning on Automatic export",
+      );
+      return;
+    }
+    res.json(saved);
+    return;
+  }
+
+  if (req.query.part === "happy") {
+    const happy = happyHoursSchema.safeParse(req.body);
+    if (!happy.success) {
+      sendError(
+        res,
+        400,
+        "invalid_input",
+        happy.error.issues[0]?.message ?? "Invalid input",
+      );
+      return;
+    }
+    const h = happy.data;
+    const saved = await withUser(userId, async (tx) => {
+      if (h.chargeEnabled) {
+        const automation = await tx`
+          select from private.user_settings where automation_enabled`;
+        if (automation.length === 0) return "automation_off" as const;
+      }
+      if (h.exportEnabled) {
+        const battery = await tx`
+          select from private.user_settings
+          where battery_kwh is not null and battery_max_kw is not null`;
+        if (battery.length === 0) return "battery_missing" as const;
+      }
+      await tx`
+        insert into private.user_settings
+          (user_id, happy_charge, happy_charge_power, happy_charge_stop,
+            happy_export, happy_export_power, happy_export_stop,
+            happy_export_min_soc)
+        values (${userId}, ${h.chargeEnabled}, ${h.chargePowerRate},
+          ${h.chargeStopSOC}, ${h.exportEnabled}, ${h.exportPowerRate},
+          ${h.exportStopSOC}, ${h.exportMinSOC})
+        on conflict (user_id) do update set
+          happy_charge = excluded.happy_charge,
+          happy_charge_power = excluded.happy_charge_power,
+          happy_charge_stop = excluded.happy_charge_stop,
+          happy_export = excluded.happy_export,
+          happy_export_power = excluded.happy_export_power,
+          happy_export_stop = excluded.happy_export_stop,
+          happy_export_min_soc = excluded.happy_export_min_soc`;
+      // A failure from an earlier try is forgotten.
+      await tx`
+        update private.automation_state set happy_export_code = null`;
+      await audit(tx, req, userId, "happy_hours_saved", h);
+      return readSettings(tx);
+    });
+    if (saved === "automation_off") {
+      sendError(
+        res,
+        409,
+        "automation_off",
+        "Turn on automatic charging before charging during happy hours",
+      );
+      return;
+    }
+    if (saved === "battery_missing") {
+      sendError(
+        res,
+        409,
+        "setup_missing",
+        "Save your battery details before exporting before happy hours",
       );
       return;
     }

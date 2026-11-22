@@ -22,7 +22,7 @@ const KINDS: NotificationKind[] = [
   {
     key: "automaticExport",
     label: "Automatic export",
-    hint: "Whether tonight's export started, or why it was skipped.",
+    hint: "Whether tonight's export, or the export before a happy hour, started, or why it was skipped.",
   },
   {
     key: "exports",

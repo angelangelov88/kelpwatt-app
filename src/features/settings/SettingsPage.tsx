@@ -7,6 +7,7 @@ import CredentialsCard from "./CredentialsCard";
 import DailyExportCard from "./DailyExportCard";
 import DangerZoneCard from "./DangerZoneCard";
 import ExportPresetsCard from "./ExportPresetsCard";
+import HappyHoursCard from "./HappyHoursCard";
 import NotificationsCard from "./NotificationsCard";
 import PasswordCard from "./PasswordCard";
 import SecurityCard from "./SecurityCard";
@@ -18,6 +19,7 @@ const SettingsPage = () => (
     <ChargeSettingsCard />
     <DailyExportCard />
     <AutomaticExportCard />
+    <HappyHoursCard />
     <ExportPresetsCard />
     <BatteryCard />
     <NotificationsCard />

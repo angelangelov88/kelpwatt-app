@@ -3,6 +3,7 @@ import InfoTip from "../../components/InfoTip";
 import Spinner from "../../components/Spinner";
 import NotReadYet from "../../components/NotReadYet";
 import SectionHeading from "./SectionHeading";
+import HistoryControls from "./HistoryControls";
 import useToast from "../../contexts/useToast";
 import useSavingSessions, { useJoinSession } from "./useSavingSessions";
 import useExportPresets from "../growatt/useExportPresets";
@@ -16,8 +17,6 @@ import type {
   PowerDownSession,
   PowerDownSessionsProps,
 } from "../../types/Octopus";
-
-const HISTORY_DAYS: HistoryDays[] = [7, 30, 365];
 
 const ukTime = (d: Date) =>
   d.toLocaleTimeString("en-GB", {
@@ -68,6 +67,7 @@ const PowerDownSessions = ({
   const handleJoin = (session: PowerDownSession) => {
     if (!session.code) return;
     const timeRange = `${ukTime(session.startAt)}–${ukTime(session.endAt)}`;
+    if (!window.confirm(`Join the ${timeRange} Power Down session?`)) return;
     join.mutate(session.code, {
       onSuccess: () => {
         showToast(`Joined the ${timeRange} Power Down session`, "success");
@@ -216,49 +216,15 @@ const PowerDownSessions = ({
 
           {/* History: sessions you joined, with points */}
           <div className="mt-6 pt-5 border-t border-gray-800">
-            <div
-              className={`flex items-center justify-between gap-3 ${showHistory ? "mb-3" : ""}`}
-            >
-              <div className="flex items-center gap-3">
-                <SectionHeading>History</SectionHeading>
-                <button
-                  role="switch"
-                  aria-checked={showHistory}
-                  aria-label="Show history"
-                  onClick={() => {
-                    setShowHistory((v) => !v);
-                  }}
-                  className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                    showHistory ? "bg-emerald-600" : "bg-gray-700"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                      showHistory ? "translate-x-4" : "translate-x-0.5"
-                    }`}
-                  />
-                </button>
-              </div>
-              {showHistory && (
-                <div className="flex gap-1 p-1 rounded-xl bg-gray-800">
-                  {HISTORY_DAYS.map((days) => (
-                    <button
-                      key={days}
-                      onClick={() => {
-                        setHistoryDays(days);
-                      }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                        historyDays === days
-                          ? "bg-gray-600 text-strong"
-                          : "text-gray-400 hover:text-gray-200"
-                      }`}
-                    >
-                      {days} days
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <HistoryControls
+              label="Show Power Down history"
+              showHistory={showHistory}
+              onToggle={() => {
+                setShowHistory((v) => !v);
+              }}
+              days={historyDays}
+              onDaysChange={setHistoryDays}
+            />
 
             {showHistory && (
               <>

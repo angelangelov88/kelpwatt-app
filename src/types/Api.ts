@@ -23,11 +23,18 @@ import type {
   dailyExportSchema,
   automaticExportSchema,
   exportPresetsSchema,
+  happyHoursSchema,
   notificationsSchema,
   settingsSchema,
   themeSchema,
 } from "../lib/settingsSchema";
-import type { ChargePlan, Dispatch, PowerDownSession } from "./Octopus";
+import type {
+  ChargePlan,
+  Dispatch,
+  HappyHour,
+  HappyHourBooking,
+  PowerDownSession,
+} from "./Octopus";
 
 // Shared by the api/ functions and the app.
 
@@ -90,7 +97,29 @@ type SavingSessions = {
   joined: SessionJson[];
 };
 
-// POST /api/octopus/join
+// GET /api/octopus/happyHours. HappyHoursData, with the dates as ISO strings.
+type HappyHourJson = Omit<HappyHour, "startAt" | "endAt"> & {
+  startAt: string;
+  endAt: string;
+};
+type HappyHourBookingJson = Omit<HappyHourBooking, "startAt" | "endAt"> & {
+  startAt: string;
+  endAt: string;
+};
+type HappyHours = {
+  region: number | null;
+  tokenBalance: number | null;
+  events: HappyHourJson[];
+  bookings: HappyHourBookingJson[];
+  // False when Octopus left the bookings out: unknown, not "none booked".
+  bookingsKnown: boolean;
+};
+
+// POST /api/octopus/cancel. confirmed: a fresh load from Octopus no longer
+// shows the booking (false if that load failed). tokenBalance: from that load.
+type CancelResult = { confirmed: boolean; tokenBalance: number | null };
+
+// POST /api/octopus/join, /api/octopus/book and /api/octopus/cancel
 type JoinBody = z.infer<typeof joinSchema>;
 
 // PUT /api/settings: the charge window, power, stop SOC and automation.
@@ -107,6 +136,10 @@ type DailyExport = z.infer<typeof dailyExportSchema>;
 // PUT /api/settings?part=automatic: Export until battery % every evening at
 // a set time.
 type AutomaticExport = z.infer<typeof automaticExportSchema>;
+
+// PUT /api/settings?part=happy: charging during, and exporting before, the
+// happy hours the user booked.
+type HappyHourSettings = z.infer<typeof happyHoursSchema>;
 
 // PUT /api/settings?part=battery: battery size and max discharge power.
 type BatteryInfo = z.infer<typeof batterySchema>;
@@ -126,6 +159,7 @@ type Settings = ChargeSettings & {
   exportPresets: ExportPresets;
   exportEveryDay: boolean;
   automaticExport: AutomaticExport;
+  happyHours: HappyHourSettings;
   theme: Theme;
   notifications: NotificationPrefs;
 } & { [K in keyof BatteryInfo]: BatteryInfo[K] | null };
@@ -241,6 +275,7 @@ export type {
   Preset,
   DailyExport,
   AutomaticExport,
+  HappyHourSettings,
   BatteryInfo,
   ThemeSetting,
   Theme,
@@ -254,6 +289,10 @@ export type {
   OctopusSlots,
   SessionJson,
   SavingSessions,
+  HappyHourJson,
+  HappyHourBookingJson,
+  HappyHours,
+  CancelResult,
   JoinBody,
   AccountExport,
   PushConfig,
