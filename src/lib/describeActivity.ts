@@ -394,6 +394,13 @@ const describeActivity = ({
         failed: !ok,
       };
     }
+    case "octopus_book_happy_hour": {
+      const ok = flag(details, "ok") ?? true;
+      return {
+        title: ok ? "Booked a happy hour" : "Couldn't book a happy hour",
+        failed: !ok,
+      };
+    }
     case "export_presets_saved":
       return {
         title: "Export to grid presets saved",

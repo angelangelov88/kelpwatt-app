@@ -85,6 +85,48 @@ type RawSavingSessions = {
   } | null;
 };
 
+// Whether a happy hour still has places, as Octopus reports it.
+type HappyHourCapacity = "AVAILABLE" | "LOW" | "FULL";
+
+// An Octopus weekend happy hour (eventType WEEKEND_HAPPY_HOUR). Booking one
+// costs tokens.
+type HappyHour = {
+  id: string;
+  code: string;
+  startAt: Date;
+  endAt: Date;
+  // null when Octopus doesn't say.
+  tokenCost: number | null;
+  capacity: HappyHourCapacity | null;
+  // Empty means every region.
+  regions: number[];
+  booked: boolean;
+};
+
+type HappyHoursData = {
+  region: number | null;
+  // null when Octopus doesn't say.
+  tokenBalance: number | null;
+  // Every happy hour Octopus currently lists, with your booked status.
+  events: HappyHour[];
+};
+
+type RawHappyHours = {
+  savingSessions: {
+    events:
+      | (RawEvent & {
+          tokenCost: number | null;
+          capacityStatus: string | null;
+        })[]
+      | null;
+    account: {
+      signedUpMeterPoint: { regionId: number } | null;
+      tokenBalance: number | null;
+      joinedEvents: { eventId: string | number; eventType: string }[] | null;
+    } | null;
+  } | null;
+};
+
 type SessionStatus = "upcoming" | "in progress" | "ended";
 
 type HistoryDays = 7 | 30 | 365;
@@ -122,6 +164,10 @@ export type {
   RawEvent,
   RawJoined,
   RawSavingSessions,
+  HappyHourCapacity,
+  HappyHour,
+  HappyHoursData,
+  RawHappyHours,
   SessionStatus,
   HistoryDays,
   PowerDownSessionsProps,

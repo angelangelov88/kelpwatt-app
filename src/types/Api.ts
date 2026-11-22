@@ -27,7 +27,12 @@ import type {
   settingsSchema,
   themeSchema,
 } from "../lib/settingsSchema";
-import type { ChargePlan, Dispatch, PowerDownSession } from "./Octopus";
+import type {
+  ChargePlan,
+  Dispatch,
+  HappyHour,
+  PowerDownSession,
+} from "./Octopus";
 
 // Shared by the api/ functions and the app.
 
@@ -90,7 +95,18 @@ type SavingSessions = {
   joined: SessionJson[];
 };
 
-// POST /api/octopus/join
+// GET /api/octopus/happyHours. HappyHoursData, with the dates as ISO strings.
+type HappyHourJson = Omit<HappyHour, "startAt" | "endAt"> & {
+  startAt: string;
+  endAt: string;
+};
+type HappyHours = {
+  region: number | null;
+  tokenBalance: number | null;
+  events: HappyHourJson[];
+};
+
+// POST /api/octopus/join and POST /api/octopus/book
 type JoinBody = z.infer<typeof joinSchema>;
 
 // PUT /api/settings: the charge window, power, stop SOC and automation.
@@ -254,6 +270,8 @@ export type {
   OctopusSlots,
   SessionJson,
   SavingSessions,
+  HappyHourJson,
+  HappyHours,
   JoinBody,
   AccountExport,
   PushConfig,

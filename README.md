@@ -21,6 +21,7 @@ The logo shows energy flowing into a battery (the violet arrow) and back out to 
   - **Export until battery %**: reads the battery % and sets one export slot, from now until the battery reaches the chosen level (aiming 2% above it), worked out from the battery details in Settings. The 5-minute check turns it off once it ends
   - Octopus's planned dispatches, with an Apply button that turns them into a charge plan (or, with automatic charging on, Sync now and when it last ran)
   - saving sessions, with Join
+  - weekend happy hours and your token balance, with Book (shown only when there's a place left and you have enough tokens)
 - **Settings:**
   - Growatt and Octopus details (checked before saving, write-only)
   - automatic charging
@@ -71,7 +72,7 @@ Supabase pg_cron (every minute, when there's news) ────▶ /api/cron/not
 api/                    Vercel functions (10 of the Hobby plan's 12)
   auth/[action].ts      login, signup, google, callback, confirm, logout, me, mfa, password
   growatt/[action].ts   charge / discharge (read and write the inverter)
-  octopus/[action].ts   slots, sessions, join
+  octopus/[action].ts   slots, sessions, join, happyHours, book
   credentials.ts        save, check and remove Growatt / Octopus details
   settings.ts           charge window, power rate, stop SOC, automation
   automation.ts         automatic charging status, Sync now
