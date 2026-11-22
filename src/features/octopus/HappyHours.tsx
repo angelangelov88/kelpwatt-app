@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import InfoTip from "../../components/InfoTip";
 import Spinner from "../../components/Spinner";
 import NotReadYet from "../../components/NotReadYet";
 import SectionHeading from "./SectionHeading";
+import HistoryControls from "./HistoryControls";
 import useToast from "../../contexts/useToast";
 import useHappyHours, {
   useBookHappyHour,
@@ -10,13 +11,18 @@ import useHappyHours, {
 } from "./useHappyHours";
 import {
   MAX_BOOKINGS_PER_WEEKEND,
+  bookedInLastDays,
   canCancel,
   cantBookReason,
   upcomingHappyHours,
   weekendLimitReached,
 } from "../../lib/happyHours";
 import { sessionStatus } from "../../lib/savingSessions";
-import type { HappyHour } from "../../types/Octopus";
+import type {
+  HappyHour,
+  HappyHourBooking,
+  HistoryDays,
+} from "../../types/Octopus";
 
 const ukTime = (d: Date) =>
   d.toLocaleTimeString("en-GB", {
@@ -34,6 +40,14 @@ const ukDay = (d: Date) =>
 
 const tokens = (n: number) => `${String(n)} ${n === 1 ? "token" : "tokens"}`;
 
+const kwh = (n: number) => `${n.toFixed(1)} kWh`;
+const pounds = (pence: number) => `£${(pence / 100).toFixed(2)}`;
+
+// Octopus sets a booking's results a few days after the happy hour, so until
+// then it's pending.
+const isPending = (b: HappyHourBooking) =>
+  b.energyUsedKwh === null && b.creditPence === null;
+
 const smallButton =
   "px-2.5 py-1 rounded-lg text-xs font-medium text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors";
 
@@ -42,6 +56,8 @@ const HappyHours = () => {
   const query = useHappyHours();
   const book = useBookHappyHour();
   const cancel = useCancelHappyHour();
+  const [historyDays, setHistoryDays] = useState<HistoryDays>(7);
+  const [showHistory, setShowHistory] = useState(false);
   const now = new Date();
 
   useEffect(() => {
@@ -103,6 +119,13 @@ const HappyHours = () => {
 
   const data = query.data;
   const upcoming = data ? upcomingHappyHours(data, now) : [];
+  const history = data ? bookedInLastDays(data, historyDays, now) : [];
+  const pending = history.filter(isPending).length;
+  const usedKwh = history.reduce((sum, b) => sum + (b.energyUsedKwh ?? 0), 0);
+  const creditPence = history.reduce((sum, b) => sum + (b.creditPence ?? 0), 0);
+  // Octopus only lists recent happy hours, so older bookings have no cost.
+  const costOf = (b: HappyHourBooking) =>
+    data?.events.find((h) => h.id === b.id)?.tokenCost ?? null;
   // Faded and locked while loading, booking or cancelling, like the Power Down
   // card.
   const isBusy = book.isPending || cancel.isPending;
@@ -136,6 +159,11 @@ const HappyHours = () => {
               <li>
                 Octopus normally lets you book {MAX_BOOKINGS_PER_WEEKEND} happy
                 hours a weekend, so Book is turned off once you have.
+              </li>
+              <li>
+                <b>History</b> shows the happy hours you booked, with the
+                electricity you used and any credit. Octopus can take a few days
+                to add these.
               </li>
             </ul>
           </InfoTip>
@@ -249,6 +277,70 @@ const HappyHours = () => {
               })}
             </div>
           )}
+
+          {/* History: happy hours you booked that have ended */}
+          <div className="mt-6 pt-5 border-t border-gray-800">
+            <HistoryControls
+              label="Show happy hour history"
+              showHistory={showHistory}
+              onToggle={() => {
+                setShowHistory((v) => !v);
+              }}
+              days={historyDays}
+              onDaysChange={setHistoryDays}
+            />
+
+            {showHistory &&
+              (history.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-3">
+                  No booked happy hours in the last {historyDays} days.
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 mb-3">
+                    {history.length} booked · {kwh(usedKwh)} used
+                    {creditPence > 0 &&
+                      ` · ${pounds(creditPence)} credit`} · {pending} pending
+                  </p>
+                  <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                    {history.map((b) => {
+                      const cost = costOf(b);
+                      return (
+                        <div
+                          key={b.id}
+                          className="flex items-center gap-3 bg-gray-800 rounded-xl px-4 py-3"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-mono text-gray-100">
+                              <span className="text-gray-400">
+                                {ukDay(b.startAt)} ·{" "}
+                              </span>
+                              {ukTime(b.startAt)}–{ukTime(b.endAt)}
+                            </p>
+                            {cost !== null && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {tokens(cost)}
+                              </p>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-300 shrink-0 text-right">
+                            {isPending(b)
+                              ? "pending"
+                              : [
+                                  b.energyUsedKwh !== null &&
+                                    `${kwh(b.energyUsedKwh)} used`,
+                                  b.creditPence && pounds(b.creditPence),
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ))}
+          </div>
         </>
       )}
     </div>

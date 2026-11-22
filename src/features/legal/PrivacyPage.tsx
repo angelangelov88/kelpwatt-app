@@ -100,7 +100,8 @@ const PrivacyPage = () => (
       <p>
         To show your dashboard and plan charging, the app also fetches your
         inverter&apos;s charge settings from Growatt and your planned charging
-        times, saving sessions, happy hours and token balance from Octopus. With
+        times, saving sessions, happy hours (including the electricity you used
+        and any credit for ones you booked) and token balance from Octopus. With
         automatic charging on, it fetches your planned charging times every 5
         minutes. These are fetched when needed and not stored, apart from what
         the activity log and the automatic charging status record.

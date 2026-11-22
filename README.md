@@ -21,7 +21,7 @@ The logo shows energy flowing into a battery (the violet arrow) and back out to 
   - **Export until battery %**: reads the battery % and sets one export slot, from now until the battery reaches the chosen level (aiming 2% above it), worked out from the battery details in Settings. The 5-minute check turns it off once it ends
   - Octopus's planned dispatches, with an Apply button that turns them into a charge plan (or, with automatic charging on, Sync now and when it last ran)
   - saving sessions, with Join
-  - weekend happy hours and your token balance, with Book (shown only when there's a place left and you have enough tokens, and turned off after 2 bookings in a weekend) and Cancel (until it starts; the server loads the happy hours again to check the booking has gone)
+  - weekend happy hours and your token balance, with Book (shown only when there's a place left and you have enough tokens, and turned off after 2 bookings in a weekend) and Cancel (until it starts; the server loads the happy hours again to check the booking has gone), and a History of past bookings (7, 30 or 365 days) with the kWh used and any credit
 - **Settings:**
   - Growatt and Octopus details (checked before saving, write-only)
   - automatic charging

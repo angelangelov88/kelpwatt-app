@@ -31,6 +31,7 @@ import type {
   ChargePlan,
   Dispatch,
   HappyHour,
+  HappyHourBooking,
   PowerDownSession,
 } from "./Octopus";
 
@@ -100,11 +101,15 @@ type HappyHourJson = Omit<HappyHour, "startAt" | "endAt"> & {
   startAt: string;
   endAt: string;
 };
+type HappyHourBookingJson = Omit<HappyHourBooking, "startAt" | "endAt"> & {
+  startAt: string;
+  endAt: string;
+};
 type HappyHours = {
   region: number | null;
   tokenBalance: number | null;
   events: HappyHourJson[];
-  bookedStarts: string[];
+  bookings: HappyHourBookingJson[];
 };
 
 // POST /api/octopus/cancel. confirmed: a fresh load from Octopus no longer
@@ -276,6 +281,7 @@ export type {
   SessionJson,
   SavingSessions,
   HappyHourJson,
+  HappyHourBookingJson,
   HappyHours,
   CancelResult,
   JoinBody,

@@ -103,14 +103,24 @@ type HappyHour = {
   booked: boolean;
 };
 
+// A happy hour you booked, from Octopus's joined events. energyUsedKwh and
+// creditPence are null until Octopus sets the results.
+type HappyHourBooking = {
+  id: string;
+  startAt: Date;
+  endAt: Date;
+  energyUsedKwh: number | null;
+  creditPence: number | null;
+};
+
 type HappyHoursData = {
   region: number | null;
   // null when Octopus doesn't say.
   tokenBalance: number | null;
   // Every happy hour Octopus currently lists, with your booked status.
   events: HappyHour[];
-  // When each happy hour you booked starts, including ones no longer listed.
-  bookedStarts: Date[];
+  // Every happy hour you booked, including ones no longer listed.
+  bookings: HappyHourBooking[];
 };
 
 type RawHappyHours = {
@@ -125,7 +135,14 @@ type RawHappyHours = {
       signedUpMeterPoint: { regionId: number } | null;
       tokenBalance: number | null;
       joinedEvents:
-        | { eventId: string | number; eventType: string; startAt: string }[]
+        | {
+            eventId: string | number;
+            eventType: string;
+            startAt: string;
+            endAt: string;
+            energyUsedInKwh: number | null;
+            rewardGivenInPence: number | null;
+          }[]
         | null;
     } | null;
   } | null;
@@ -134,6 +151,16 @@ type RawHappyHours = {
 type SessionStatus = "upcoming" | "in progress" | "ended";
 
 type HistoryDays = 7 | 30 | 365;
+
+// The History heading with its on/off switch and day buttons, shared by the
+// Power Down and Happy Hours cards. label names the switch for screen readers.
+type HistoryControlsProps = {
+  label: string;
+  showHistory: boolean;
+  onToggle: () => void;
+  days: HistoryDays;
+  onDaysChange: (days: HistoryDays) => void;
+};
 
 type PowerDownSessionsProps = {
   // Adds the session window to Grid First with High Export settings.
@@ -170,10 +197,12 @@ export type {
   RawSavingSessions,
   HappyHourCapacity,
   HappyHour,
+  HappyHourBooking,
   HappyHoursData,
   RawHappyHours,
   SessionStatus,
   HistoryDays,
+  HistoryControlsProps,
   PowerDownSessionsProps,
   OctopusProps,
   CheckNowProps,

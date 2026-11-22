@@ -1,7 +1,9 @@
 import type {
   HappyHour,
+  HappyHourBooking,
   HappyHourCapacity,
   HappyHoursData,
+  HistoryDays,
   RawHappyHours,
 } from "../types/Octopus";
 import { octopusRequest, OctopusError } from "./octopusApi";
@@ -24,7 +26,7 @@ const QUERY = `query HappyHours($account: String!) {
     account(accountNumber: $account) {
       signedUpMeterPoint { regionId }
       tokenBalance
-      joinedEvents { eventId eventType startAt }
+      joinedEvents { eventId eventType startAt endAt energyUsedInKwh rewardGivenInPence }
     }
   }
 }`;
@@ -80,7 +82,15 @@ const fetchHappyHours = async (
     region: data.account?.signedUpMeterPoint?.regionId ?? null,
     tokenBalance: data.account?.tokenBalance ?? null,
     events,
-    bookedStarts: booked.map((e) => new Date(e.startAt)),
+    bookings: booked.map(
+      (e): HappyHourBooking => ({
+        id: String(e.eventId),
+        startAt: new Date(e.startAt),
+        endAt: new Date(e.endAt),
+        energyUsedKwh: e.energyUsedInKwh,
+        creditPence: e.rewardGivenInPence,
+      }),
+    ),
   };
 };
 
@@ -171,9 +181,21 @@ const weekendOf = (d: Date) => {
 const weekendLimitReached = (h: HappyHour, data: HappyHoursData) => {
   const weekend = weekendOf(h.startAt);
   return (
-    data.bookedStarts.filter((s) => weekendOf(s) === weekend).length >=
+    data.bookings.filter((b) => weekendOf(b.startAt) === weekend).length >=
     MAX_BOOKINGS_PER_WEEKEND
   );
+};
+
+// Bookings for happy hours that ended in the last `days` days, newest first.
+const bookedInLastDays = (
+  data: HappyHoursData,
+  days: HistoryDays,
+  now = new Date(),
+) => {
+  const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  return data.bookings
+    .filter((b) => b.startAt >= from && b.endAt <= now)
+    .sort((a, b) => b.startAt.getTime() - a.startAt.getTime());
 };
 
 export {
@@ -185,4 +207,5 @@ export {
   upcomingHappyHours,
   cantBookReason,
   weekendLimitReached,
+  bookedInLastDays,
 };
