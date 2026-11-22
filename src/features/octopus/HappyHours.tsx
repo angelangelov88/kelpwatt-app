@@ -72,6 +72,9 @@ const HappyHours = () => {
 
   const handleBook = (happyHour: HappyHour) => {
     const when = `${ukDay(happyHour.startAt)} ${ukTime(happyHour.startAt)}–${ukTime(happyHour.endAt)}`;
+    const cost =
+      happyHour.tokenCost !== null ? ` for ${tokens(happyHour.tokenCost)}` : "";
+    if (!window.confirm(`Book the ${when} happy hour${cost}?`)) return;
     book.mutate(happyHour.code, {
       onSuccess: () => {
         showToast(`Booked the ${when} happy hour`, "success");

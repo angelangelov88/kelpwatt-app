@@ -67,6 +67,7 @@ const PowerDownSessions = ({
   const handleJoin = (session: PowerDownSession) => {
     if (!session.code) return;
     const timeRange = `${ukTime(session.startAt)}–${ukTime(session.endAt)}`;
+    if (!window.confirm(`Join the ${timeRange} Power Down session?`)) return;
     join.mutate(session.code, {
       onSuccess: () => {
         showToast(`Joined the ${timeRange} Power Down session`, "success");
