@@ -4,9 +4,13 @@ import Spinner from "../../components/Spinner";
 import NotReadYet from "../../components/NotReadYet";
 import SectionHeading from "./SectionHeading";
 import useToast from "../../contexts/useToast";
-import useHappyHours, { useBookHappyHour } from "./useHappyHours";
+import useHappyHours, {
+  useBookHappyHour,
+  useCancelHappyHour,
+} from "./useHappyHours";
 import {
   MAX_BOOKINGS_PER_WEEKEND,
+  canCancel,
   cantBookReason,
   upcomingHappyHours,
   weekendLimitReached,
@@ -37,6 +41,7 @@ const HappyHours = () => {
   const { showToast } = useToast();
   const query = useHappyHours();
   const book = useBookHappyHour();
+  const cancel = useCancelHappyHour();
   const now = new Date();
 
   useEffect(() => {
@@ -65,10 +70,43 @@ const HappyHours = () => {
     });
   };
 
+  const handleCancel = (happyHour: HappyHour) => {
+    const when = `${ukDay(happyHour.startAt)} ${ukTime(happyHour.startAt)}–${ukTime(happyHour.endAt)}`;
+    if (!window.confirm(`Cancel your booking for the ${when} happy hour?`))
+      return;
+    cancel.mutate(happyHour.code, {
+      onSuccess: ({ confirmed, tokenBalance }) => {
+        if (confirmed)
+          showToast(
+            `Cancelled the ${when} happy hour` +
+              (tokenBalance !== null
+                ? `. You now have ${tokens(tokenBalance)}`
+                : ""),
+            "success",
+          );
+        else
+          showToast(
+            `Octopus accepted the cancellation of the ${when} happy hour, but Kelpwatt couldn't check it. Load again to make sure`,
+            "info",
+          );
+        load();
+      },
+      onError: (error) => {
+        showToast(
+          `Couldn't cancel the ${when} happy hour: ${error.message}`,
+          "error",
+        );
+        load();
+      },
+    });
+  };
+
   const data = query.data;
   const upcoming = data ? upcomingHappyHours(data, now) : [];
-  // Faded and locked while loading or booking, like the Power Down card.
-  const isDisabled = query.isFetching || book.isPending;
+  // Faded and locked while loading, booking or cancelling, like the Power Down
+  // card.
+  const isBusy = book.isPending || cancel.isPending;
+  const isDisabled = query.isFetching || isBusy;
 
   return (
     <div
@@ -90,6 +128,10 @@ const HappyHours = () => {
               <li>
                 <b>Book</b> spends your tokens on one. It only shows when
                 there&apos;s a place left and you have enough tokens.
+              </li>
+              <li>
+                <b>Cancel</b> cancels a booking. You can cancel until the happy
+                hour starts.
               </li>
               <li>
                 Octopus normally lets you book {MAX_BOOKINGS_PER_WEEKEND} happy
@@ -142,6 +184,8 @@ const HappyHours = () => {
                 // Shown, but disabled, once the weekend's bookings are used up.
                 const atLimit = canBook && weekendLimitReached(h, data);
                 const isBooking = book.isPending && book.variables === h.code;
+                const isCancelling =
+                  cancel.isPending && cancel.variables === h.code;
                 return (
                   <div
                     key={h.id}
@@ -177,12 +221,20 @@ const HappyHours = () => {
                           onClick={() => {
                             handleBook(h);
                           }}
-                          disabled={
-                            atLimit || book.isPending || query.isFetching
-                          }
+                          disabled={atLimit || isBusy || query.isFetching}
                           className={`${smallButton} bg-blue-600 hover:bg-blue-500 disabled:hover:bg-blue-600`}
                         >
                           {isBooking ? "Booking…" : "Book"}
+                        </button>
+                      ) : canCancel(h, now) ? (
+                        <button
+                          onClick={() => {
+                            handleCancel(h);
+                          }}
+                          disabled={isBusy || query.isFetching}
+                          className={`${smallButton} bg-gray-600 hover:bg-gray-500 disabled:hover:bg-gray-600`}
+                        >
+                          {isCancelling ? "Cancelling…" : "Cancel"}
                         </button>
                       ) : (
                         reason && (

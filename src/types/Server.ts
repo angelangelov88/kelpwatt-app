@@ -54,6 +54,7 @@ type AuditAction =
   | "growatt_write"
   | "octopus_join"
   | "octopus_book_happy_hour"
+  | "octopus_cancel_happy_hour"
   | "automation_run"
   | "signed_in"
   | "export_presets_saved"

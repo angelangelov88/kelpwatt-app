@@ -101,6 +101,28 @@ const bookHappyHour = async (
   );
 };
 
+const CANCEL_MUTATION = `mutation CancelHappyHour($input: CancelSavingSessionsWeekendHappyHourBookingInput!) {
+  cancelSavingSessionsWeekendHappyHourBooking(input: $input) { accountNumber }
+}`;
+
+// Cancels one happy hour booking. Octopus only replies with the account number
+// (or an error), so the caller loads the happy hours again to confirm it's gone.
+const cancelHappyHour = async (
+  token: string,
+  account: string,
+  eventCode: string,
+): Promise<void> => {
+  await octopusRequest(
+    CANCEL_MUTATION,
+    { input: { accountNumber: account, eventCode } },
+    { token, endpoint: BACKEND_ENDPOINT },
+  );
+};
+
+// A booking can be cancelled until the happy hour starts.
+const canCancel = (h: HappyHour, now = new Date()) =>
+  h.booked && sessionStatus(h, now) === "upcoming";
+
 // Happy hours in your region that haven't ended, soonest first.
 const upcomingHappyHours = (data: HappyHoursData, now = new Date()) =>
   data.events
@@ -158,6 +180,8 @@ export {
   MAX_BOOKINGS_PER_WEEKEND,
   fetchHappyHours,
   bookHappyHour,
+  cancelHappyHour,
+  canCancel,
   upcomingHappyHours,
   cantBookReason,
   weekendLimitReached,

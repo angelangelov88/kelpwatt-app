@@ -401,6 +401,22 @@ const describeActivity = ({
         failed: !ok,
       };
     }
+    case "octopus_cancel_happy_hour": {
+      const ok = flag(details, "ok") ?? true;
+      const confirmed = flag(details, "confirmed");
+      return {
+        title: ok
+          ? "Cancelled a happy hour booking"
+          : "Couldn't cancel a happy hour booking",
+        detail:
+          ok && confirmed === false
+            ? "Octopus accepted it, but Kelpwatt couldn't check it afterwards"
+            : !ok && confirmed === false
+              ? "Octopus accepted it, but still showed it as booked afterwards"
+              : undefined,
+        failed: !ok,
+      };
+    }
     case "export_presets_saved":
       return {
         title: "Export to grid presets saved",

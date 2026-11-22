@@ -1,6 +1,11 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "../../lib/apiClient";
-import type { HappyHourJson, HappyHours, JoinBody } from "../../types/Api";
+import type {
+  CancelResult,
+  HappyHourJson,
+  HappyHours,
+  JoinBody,
+} from "../../types/Api";
 import type { HappyHour, HappyHoursData } from "../../types/Octopus";
 
 // The server sends the dates as ISO strings.
@@ -41,5 +46,15 @@ const useBookHappyHour = () =>
       }),
   });
 
-export { useBookHappyHour };
+// Resolves with whether Octopus confirmed the booking is gone.
+const useCancelHappyHour = () =>
+  useMutation({
+    mutationFn: (eventCode: string) =>
+      apiRequest<CancelResult>("octopus/cancel", {
+        method: "POST",
+        body: { eventCode } satisfies JoinBody,
+      }),
+  });
+
+export { useBookHappyHour, useCancelHappyHour };
 export default useHappyHours;

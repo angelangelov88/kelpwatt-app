@@ -107,7 +107,11 @@ type HappyHours = {
   bookedStarts: string[];
 };
 
-// POST /api/octopus/join and POST /api/octopus/book
+// POST /api/octopus/cancel. confirmed: a fresh load from Octopus no longer
+// shows the booking (false if that load failed). tokenBalance: from that load.
+type CancelResult = { confirmed: boolean; tokenBalance: number | null };
+
+// POST /api/octopus/join, /api/octopus/book and /api/octopus/cancel
 type JoinBody = z.infer<typeof joinSchema>;
 
 // PUT /api/settings: the charge window, power, stop SOC and automation.
@@ -273,6 +277,7 @@ export type {
   SavingSessions,
   HappyHourJson,
   HappyHours,
+  CancelResult,
   JoinBody,
   AccountExport,
   PushConfig,

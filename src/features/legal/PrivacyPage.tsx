@@ -76,13 +76,13 @@ const PrivacyPage = () => (
           link), changing your password, turning two-step verification on or
           off, saving, removing or failing to verify your Growatt or Octopus
           details, saving settings, changes sent to your inverter, saving
-          sessions you join, happy hours you book, automatic charging checks
-          that changed your inverter, started failing or started working again,
-          each evening&apos;s Automatic export (when it started or why it was
-          skipped, with your battery level at the time), and downloads of your
-          data, and a summary of each night&apos;s automatic charging with your
-          battery level the next morning. It never contains passwords or keys.
-          You can read it on the Activity page.
+          sessions you join, happy hours you book or cancel, automatic charging
+          checks that changed your inverter, started failing or started working
+          again, each evening&apos;s Automatic export (when it started or why it
+          was skipped, with your battery level at the time), and downloads of
+          your data, and a summary of each night&apos;s automatic charging with
+          your battery level the next morning. It never contains passwords or
+          keys. You can read it on the Activity page.
         </li>
         <li>
           <strong className="text-gray-100">Messages you send us:</strong> if
@@ -178,8 +178,8 @@ const PrivacyPage = () => (
         <li>
           <strong className="text-gray-100">Octopus Energy</strong>: we use your
           API key to read your planned charging times, saving sessions, happy
-          hours and token balance, and to join a session or book a happy hour
-          when you ask.
+          hours and token balance, and to join a session or book or cancel a
+          happy hour when you ask.
         </li>
         <li>
           <strong className="text-gray-100">
