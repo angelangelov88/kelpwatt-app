@@ -148,6 +148,17 @@ const describeAutomation = (details: unknown): ActivityDescription => {
         detail: trigger,
         failed: false,
       };
+    // Charging carried on with the happy hours last loaded.
+    case "happy_hours_failed":
+      return {
+        title: "Couldn't load your happy hours",
+        detail: join([
+          trigger,
+          text(details, "message"),
+          "Charging during the happy hours last loaded",
+        ]),
+        failed: true,
+      };
     default:
       return { title: "Automatic charging ran", failed: false };
   }

@@ -111,6 +111,8 @@ type HappyHours = {
   tokenBalance: number | null;
   events: HappyHourJson[];
   bookings: HappyHourBookingJson[];
+  // False when Octopus left the bookings out: unknown, not "none booked".
+  bookingsKnown: boolean;
 };
 
 // POST /api/octopus/cancel. confirmed: a fresh load from Octopus no longer

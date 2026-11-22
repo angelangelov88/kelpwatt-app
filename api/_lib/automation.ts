@@ -22,7 +22,9 @@ import {
   exportTarget,
   happyExportStatus,
   happyHourBlocks,
+  blocksToText,
   slotsToRestore,
+  textToBlocks,
 } from "../../src/lib/happyHourAutomation";
 import { fetchHappyHours } from "../../src/lib/happyHours";
 import { GrowattDeadlineError } from "../../src/lib/growattApi";
@@ -43,6 +45,8 @@ import type {
   AutomationResult,
   AutomationStateRow,
   AutomationTrigger,
+  LoadOctopus,
+  OctopusCalls,
   Tx,
 } from "../../src/types/Server";
 import {
@@ -110,7 +114,7 @@ const takeLease = async (userId: string) => {
         automatic_export_code, automatic_export_message,
         summary_on::text as summary_on, failing_since, failure_notified,
         happy_export_for, happy_export_code, happy_export_target,
-        one_off_restore_power,
+        happy_bookings, happy_charge_code, one_off_restore_power,
         one_off_restore_stop, one_off_restore_slots`,
   );
   return rows.at(0) ?? null;
@@ -131,7 +135,7 @@ const once = <T>(load: () => Promise<T>) => {
 
 // The user's Octopus calls for one check, each made at most once however many
 // of its parts need them.
-const octopusCalls = (apiKey: string, account: string) => {
+const octopusCalls = (apiKey: string, account: string): OctopusCalls => {
   const token = once(async () => {
     try {
       return await obtainToken(apiKey);
@@ -157,18 +161,22 @@ const octopusCalls = (apiKey: string, account: string) => {
     // The happy hours the user booked.
     bookings: once(async () => {
       const t = await token();
+      let data;
       try {
-        return (await fetchHappyHours(t, account)).bookings;
+        data = await fetchHappyHours(t, account);
       } catch (err) {
         throw new AutomationError("happy_hours_failed", octopusMessage(err));
       }
+      // Not "nothing booked": that would take happy hours off the inverter.
+      if (!data.bookingsKnown)
+        throw new AutomationError(
+          "happy_hours_failed",
+          "Octopus didn't send your happy hour bookings",
+        );
+      return data.bookings;
     }),
   };
 };
-
-type OctopusCalls = ReturnType<typeof octopusCalls>;
-// null when the user has no Octopus details.
-type LoadOctopus = () => Promise<OctopusCalls | null>;
 
 type Growatt = NonNullable<Awaited<ReturnType<typeof loadGrowatt>>>;
 
@@ -257,6 +265,9 @@ const applyToInverter = async (
 // With Settings → Happy hours charging on, booked happy hours starting within
 // 30 minutes are charged in too, at their own power and stop level (Growatt
 // has one of each for every charge time). happyHours: their times, or "".
+// blocks: the booked happy hours that haven't ended. If they can't be loaded,
+// the ones last loaded are used instead (happyFailure says why), so automatic
+// charging carries on and a happy hour's charge times stay on.
 const sync = async (
   userId: string,
   settings: Settings,
@@ -276,9 +287,17 @@ const sync = async (
     );
   const dispatches = await calls.dispatches();
   const happy = settings.happyHours;
-  const charge = happy.chargeEnabled
-    ? blocksToCharge(happyHourBlocks(await calls.bookings()))
-    : [];
+  let blocks: HappyBlock[] = [];
+  let happyFailure: AutomationError | null = null;
+  if (happy.chargeEnabled)
+    try {
+      blocks = happyHourBlocks(await calls.bookings());
+    } catch (err) {
+      if (!(err instanceof AutomationError)) throw err;
+      happyFailure = err;
+      blocks = textToBlocks(state.happy_bookings);
+    }
+  const charge = blocksToCharge(blocks);
   const plan = buildChargePlan(
     [...dispatches, ...charge],
     charge.length > 0
@@ -297,6 +316,8 @@ const sync = async (
     return {
       plan,
       happyHours,
+      blocks,
+      happyFailure,
       reached: false,
       replaced: null,
       verified: false,
@@ -304,6 +325,8 @@ const sync = async (
   return {
     plan,
     happyHours,
+    blocks,
+    happyFailure,
     reached: true,
     ...(await applyToInverter(growatt, plan, force || !isRecent)),
   };
@@ -322,7 +345,15 @@ const checkCharge = async (
   deadline: number,
 ): Promise<{ outcome: AutomationOutcome; paused: boolean }> => {
   try {
-    const { plan, happyHours, reached, replaced, verified } = await sync(
+    const {
+      plan,
+      happyHours,
+      blocks,
+      happyFailure,
+      reached,
+      replaced,
+      verified,
+    } = await sync(
       userId,
       settings,
       state,
@@ -331,6 +362,14 @@ const checkCharge = async (
       deadline,
     );
     const applied = replaced !== null;
+    // The bookings kept for a check that can't load them: none with happy
+    // hour charging off, and the ones last loaded while loading fails.
+    const happyBookings = !settings.happyHours.chargeEnabled
+      ? null
+      : happyFailure
+        ? state.happy_bookings
+        : blocksToText(blocks);
+    const happyCode = happyFailure?.code ?? null;
     await withUser(userId, async (tx) => {
       await tx`
         update private.automation_state set
@@ -344,6 +383,23 @@ const checkCharge = async (
             plan_slots = ${describePlan(plan)},
             inverter_checked_at = case when ${verified} then now() end,
             applied_at = case when ${applied} then now() else applied_at end`;
+      if (
+        happyBookings !== state.happy_bookings ||
+        happyCode !== state.happy_charge_code
+      )
+        await tx`
+          update private.automation_state set
+            happy_bookings = ${happyBookings},
+            happy_charge_code = ${happyCode}`;
+      // Once per problem, not every 5 minutes while it lasts. Charging
+      // carries on with the happy hours last loaded.
+      if (happyFailure && happyCode !== state.happy_charge_code)
+        await audit(tx, req, userId, "automation_run", {
+          result: "happy_hours_failed",
+          trigger,
+          code: happyFailure.code,
+          message: happyFailure.message,
+        });
       // Changes to the inverter always go in the audit log, and a check that
       // ends a run of failures says so. added/ended/removed say what changed,
       // compared with what the inverter had.
@@ -539,25 +595,32 @@ const hasOneOff = async (userId: string) => {
   return rows.length > 0;
 };
 
+// The booked happy hours that haven't ended, for the export before one while
+// it runs; null when they can't be loaded (automatic charging's check reports
+// that).
+const currentHappyBlocks = async (
+  octopus: LoadOctopus,
+): Promise<HappyBlock[] | null> => {
+  const calls = await octopus();
+  if (!calls) return null;
+  try {
+    return happyHourBlocks(await calls.bookings());
+  } catch {
+    return null;
+  }
+};
+
 // True when the export running now is the one before a happy hour (it has
 // export times to put back) and that happy hour is no longer booked: cancelled
-// or moved. If the bookings can't be read, the export carries on.
-const isHappyHourGone = async (
+// or moved. blocks: from currentHappyBlocks; if they couldn't be loaded, the
+// export carries on.
+const isHappyHourGone = (
   state: AutomationStateRow,
-  octopus: LoadOctopus,
+  blocks: HappyBlock[] | null,
 ) => {
   const start = state.happy_export_for;
-  if (state.one_off_restore_slots === null || !start) return false;
-  const calls = await octopus();
-  if (!calls) return false;
-  try {
-    return !happyHourBlocks(await calls.bookings()).some(
-      (block) => block.start.getTime() === start.getTime(),
-    );
-  } catch {
-    // Automatic charging's check reports it.
-    return false;
-  }
+  if (state.one_off_restore_slots === null || !start || !blocks) return false;
+  return !blocks.some((block) => block.start.getTime() === start.getTime());
 };
 
 // Export until battery %, once its slot has ended: turns the export times off
@@ -570,10 +633,14 @@ const isHappyHourGone = async (
 // the account can't get locked, and the reset clears the slot instead.
 // cancelled: stopped early because its happy hour is no longer booked; that
 // happy hour is forgotten too, so booking it again gets a new export.
+// blocks: the happy hours booked now (currentHappyBlocks), null if unknown.
+// Export times during today's ones aren't put back either: the happy hour may
+// have moved, or another been booked, since the export started.
 // paused: that login was refused, so nothing else should try it this check.
 const endOneOff = async (
   userId: string,
   state: AutomationStateRow,
+  blocks: HappyBlock[] | null,
   req: VercelRequest | null,
   deadline: number,
   cancelled = false,
@@ -588,7 +655,14 @@ const endOneOff = async (
       await tx`update private.automation_state set happy_export_for = null`;
   };
   const until = state.one_off_until;
-  const restore = state.one_off_restore_slots;
+  const saved = state.one_off_restore_slots;
+  const today = ukDay(new Date());
+  const restore =
+    saved === null || !blocks
+      ? saved
+      : blocks
+          .filter((b) => ukDay(b.start) === today)
+          .reduce((slots, b) => slotsToRestore(slots, b), saved);
   const growatt = await loadGrowatt(userId, deadline);
   if (!until || !growatt || resetDay() >= ukDay(until)) {
     await withUser(userId, forget);
@@ -967,12 +1041,13 @@ const runHappyExport = async (
 // less, so the export's stop level goes up to match. Growatt stops exporting
 // there by itself, even if the battery is already below it. If the export
 // times were changed since, they're left alone. A failure is tried again
-// next check and logged once. paused: that login was refused.
+// next check and logged once. blocks: the happy hours booked now
+// (currentHappyBlocks), null if unknown. paused: that login was refused.
 const raiseHappyExportStop = async (
   userId: string,
   settings: Settings,
   state: AutomationStateRow,
-  octopus: LoadOctopus,
+  blocks: HappyBlock[] | null,
   req: VercelRequest | null,
   deadline: number,
 ): Promise<{ result: AutomationResult; paused: boolean }> => {
@@ -986,20 +1061,11 @@ const raiseHappyExportStop = async (
     was === null ||
     slot === null ||
     batteryKwh === null ||
-    maxDischargeKw === null
+    maxDischargeKw === null ||
+    !blocks
   )
     return unchanged;
-  const calls = await octopus();
-  if (!calls) return unchanged;
-  let block: HappyBlock | undefined;
-  try {
-    block = happyHourBlocks(await calls.bookings()).find(
-      (b) => b.start.getTime() === start.getTime(),
-    );
-  } catch {
-    // Automatic charging's check reports it.
-    return unchanged;
-  }
+  const block = blocks.find((b) => b.start.getTime() === start.getTime());
   // Gone altogether: isHappyHourGone stops the export instead.
   if (!block) return unchanged;
   const target = exportTarget(
@@ -1202,6 +1268,14 @@ const check = async (
     // One inverter write per check (each takes 20–30s of the function's 60),
     // and no second go at a login that was just refused.
     let canWrite = true;
+    // While the export before a happy hour runs, the happy hours booked now,
+    // read once for ending, stopping or shortening it.
+    const blocks =
+      scheduled &&
+      state.one_off_until !== null &&
+      state.one_off_restore_slots !== null
+        ? await currentHappyBlocks(octopus)
+        : null;
     const oneOffEnded =
       scheduled &&
       state.one_off_until !== null &&
@@ -1210,9 +1284,16 @@ const check = async (
       scheduled &&
       !oneOffEnded &&
       state.one_off_until !== null &&
-      (await isHappyHourGone(state, octopus));
+      isHappyHourGone(state, blocks);
     if (oneOffEnded || cancelled) {
-      const ended = await endOneOff(userId, state, req, deadline, cancelled);
+      const ended = await endOneOff(
+        userId,
+        state,
+        blocks,
+        req,
+        deadline,
+        cancelled,
+      );
       outcome = { result: ended.result, plan: null };
       canWrite = ended.result !== "applied" && !ended.paused;
     } else if (scheduled && state.one_off_until !== null) {
@@ -1221,7 +1302,7 @@ const check = async (
         userId,
         settings,
         state,
-        octopus,
+        blocks,
         req,
         deadline,
       );

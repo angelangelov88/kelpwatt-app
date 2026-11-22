@@ -20,6 +20,7 @@ const fetchHappyHours = async (): Promise<HappyHoursData> => {
   return {
     region: data.region,
     tokenBalance: data.tokenBalance,
+    bookingsKnown: data.bookingsKnown,
     events: data.events.map(toHappyHour),
     bookings: data.bookings.map((b) => ({
       ...b,

@@ -188,6 +188,7 @@ This is how production is set up, and what you'd repeat for a fresh copy.
    | `0015_push`               | Push notifications: devices, kinds, the once-a-minute sender        |
    | `0016_failure_notify`     | Failure notifications only once a problem lasts or needs the user   |
    | `0017_happy_hours`        | Charging during, and exporting before, booked happy hours           |
+   | `0018_happy_hours_fixes`  | Export levels only checked with it on; happy hour bookings kept     |
 
    There's no migration tool. Each migration is applied by hand, once. Before `0007`, store `CRON_SECRET` in Vault (see [Automatic charging](#automatic-charging)).
 

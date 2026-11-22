@@ -72,7 +72,11 @@ const PrivacyPage = () => (
           try failed, if it did, so it runs at most once an evening. If you
           export before happy hours, the last happy hour it ran for and why its
           last try failed, if it did, the battery level the export stops at, and
-          the export times to put back on your inverter afterwards.
+          the export times to put back on your inverter afterwards. If you
+          charge during happy hours, the times of the ones you booked that
+          haven&apos;t ended yet, as last loaded from Octopus, so charging
+          carries on if Octopus doesn&apos;t answer, and why loading them last
+          failed, if it did.
         </li>
         <li>
           <strong className="text-gray-100">An activity log:</strong> a record

@@ -133,9 +133,36 @@ const slotsToRestore = (described: string, block: HappyBlock) => {
     .join(", ");
 };
 
+// How many blocks automation_state.happy_bookings keeps (its column allows
+// 500 characters).
+const SAVED_BLOCKS = 8;
+
+// The blocks as automation_state.happy_bookings keeps them: "start/end, …"
+// in ISO form, soonest first.
+const blocksToText = (blocks: HappyBlock[]) =>
+  blocks
+    .slice(0, SAVED_BLOCKS)
+    .map((b) => `${b.start.toISOString()}/${b.end.toISOString()}`)
+    .join(", ");
+
+// Back from that, without the ones that have ended or don't read as dates.
+const textToBlocks = (saved: string | null, now = new Date()) =>
+  happyHourBlocks(
+    (saved ?? "")
+      .split(", ")
+      .filter(Boolean)
+      .map((part) => {
+        const [start = "", end = ""] = part.split("/");
+        return { startAt: new Date(start), endAt: new Date(end) };
+      }),
+    now,
+  );
+
 export {
   CHARGE_LEAD_MIN,
   happyHourBlocks,
+  blocksToText,
+  textToBlocks,
   blocksToCharge,
   describeBlocks,
   exportTarget,

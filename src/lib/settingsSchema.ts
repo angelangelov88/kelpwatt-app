@@ -110,7 +110,7 @@ const happyHoursSchema = z
     // Only export if the battery is at least this full, in percent.
     exportMinSOC: stepSchema,
   })
-  .refine((s) => s.exportMinSOC > s.exportStopSOC, {
+  .refine((s) => !s.exportEnabled || s.exportMinSOC > s.exportStopSOC, {
     message: "Must be above the stop level",
     path: ["exportMinSOC"],
   })

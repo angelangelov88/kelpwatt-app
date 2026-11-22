@@ -7,7 +7,8 @@ import slots from "../_handlers/octopus/slots";
 import { createRouter } from "../_lib/router";
 
 // Up to four Octopus calls of at most 15s each (cancel: token, check, cancel,
-// check again).
+// check again). Cancel skips the check again when it's short of time, so its
+// reply and audit row still fit (RECHECK_UNTIL_MS).
 export const config = { maxDuration: 60 };
 
 // /api/octopus/<action>. The code is in api/_handlers/octopus/.

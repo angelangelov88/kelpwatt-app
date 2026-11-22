@@ -14,11 +14,16 @@ import { rateLimit } from "../../_lib/rateLimit";
 import { requireUser } from "../../_lib/session";
 import { connectOctopus, octopusMessage } from "./connect";
 
+// The check again only starts this long into the request: it can take 15s,
+// and the reply and audit row need to fit in the function's 60.
+const RECHECK_UNTIL_MS = 35_000;
+
 // POST JoinBody → CancelResult. Cancels one happy hour booking, only before it
 // starts. Octopus's reply doesn't show the booking has gone, so the happy hours
 // are loaded again afterwards to check. Shares Power Down joining's rate limit.
 // Every cancel sent to Octopus is recorded in audit_log.
 const handler: Handler = async (req, res) => {
+  const startedAt = Date.now();
   if (!allowMethods(req, res, ["POST"]) || !checkOrigin(req, res)) return;
   const user = await requireUser(req, res);
   if (!user) return;
@@ -79,13 +84,16 @@ const handler: Handler = async (req, res) => {
     return;
   }
 
-  // Load again: the booking should be gone. null if the load failed.
+  // Load again: the booking should be gone. null if the load failed, there
+  // wasn't time, or Octopus didn't send the bookings.
   let after = null;
-  try {
-    after = await fetchHappyHours(octopus.token, octopus.account);
-  } catch (err) {
-    console.error("octopus happy hours recheck failed:", octopusMessage(err));
-  }
+  if (Date.now() - startedAt < RECHECK_UNTIL_MS)
+    try {
+      const loaded = await fetchHappyHours(octopus.token, octopus.account);
+      if (loaded.bookingsKnown) after = loaded;
+    } catch (err) {
+      console.error("octopus happy hours recheck failed:", octopusMessage(err));
+    }
   const stillBooked =
     after?.events.some((h) => h.code === eventCode && h.booked) ?? false;
   await withUser(user.userId, (tx) =>

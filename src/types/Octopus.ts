@@ -121,6 +121,9 @@ type HappyHoursData = {
   events: HappyHour[];
   // Every happy hour you booked, including ones no longer listed.
   bookings: HappyHourBooking[];
+  // false when Octopus sent no account data, so bookings is empty only
+  // because it's unknown, not because nothing is booked.
+  bookingsKnown: boolean;
 };
 
 type RawHappyHours = {

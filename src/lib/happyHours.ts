@@ -79,6 +79,7 @@ const fetchHappyHours = async (
     );
 
   return {
+    bookingsKnown: Array.isArray(data.account?.joinedEvents),
     region: data.account?.signedUpMeterPoint?.regionId ?? null,
     tokenBalance: data.account?.tokenBalance ?? null,
     events,
@@ -147,7 +148,7 @@ const upcomingHappyHours = (data: HappyHoursData, now = new Date()) =>
 
 // Why a happy hour can't be booked, or null if it can. Booking needs it not to
 // have started, a place left, and enough tokens. When Octopus doesn't say the
-// cost, at least one token.
+// cost, at least one token; when it doesn't say the balance, Octopus decides.
 const cantBookReason = (
   h: HappyHour,
   tokenBalance: number | null,
@@ -156,7 +157,7 @@ const cantBookReason = (
   if (h.booked) return null;
   if (sessionStatus(h, now) !== "upcoming") return "Too late to book";
   if (h.capacity === "FULL") return "Full";
-  if (tokenBalance === null || tokenBalance < (h.tokenCost ?? 1))
+  if (tokenBalance !== null && tokenBalance < (h.tokenCost ?? 1))
     return "Not enough tokens";
   return null;
 };
